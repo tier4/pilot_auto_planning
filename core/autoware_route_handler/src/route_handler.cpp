@@ -643,14 +643,13 @@ lanelet::ConstLanelets RouteHandler::getLaneletSequenceAfter(
 
   double length = 0;
   lanelet::ConstLanelet current_lanelet = lanelet;
-  std::unordered_set<lanelet::Id> visited_ids{lanelet.id()};
-  while (length < min_length) {
+  while (rclcpp::ok() && length < min_length) {
     lanelet::ConstLanelet next_lanelet;
     if (!getNextLaneletWithinRoute(current_lanelet, &next_lanelet)) {
       break;
     }
-    // loop check: a lanelet is visited at most once so that a cyclic route terminates
-    if (!visited_ids.insert(next_lanelet.id()).second) {
+    // loop check
+    if (lanelet.id() == next_lanelet.id()) {
       break;
     }
     lanelet_sequence_forward.push_back(next_lanelet);
@@ -694,7 +693,7 @@ lanelet::ConstLanelets RouteHandler::getLaneletSequenceUpTo(
       [&lanelet_to_check](auto & backward) { return (backward.id() == lanelet_to_check.id()); });
   };
 
-  while (length < min_length) {
+  while (rclcpp::ok() && length < min_length) {
     previous_lanelets.clear();
     if (!getPreviousLaneletsWithinRoute(current_lanelet, &previous_lanelets)) {
       break;
@@ -702,7 +701,6 @@ lanelet::ConstLanelets RouteHandler::getLaneletSequenceUpTo(
 
     if (checkForLoop(previous_lanelets, true)) break;
 
-    const auto previous_id = current_lanelet.id();
     for (const auto & prev_lanelet : previous_lanelets) {
       if (!isNewLanelet(prev_lanelet) || exists(goal_lanelets_, prev_lanelet)) continue;
       lanelet_sequence_backward.push_back(prev_lanelet);
@@ -711,8 +709,6 @@ lanelet::ConstLanelets RouteHandler::getLaneletSequenceUpTo(
       current_lanelet = prev_lanelet;
       break;
     }
-    // none of the previous lanelets was new, so the traversal cannot progress any further
-    if (current_lanelet.id() == previous_id) break;
   }
 
   std::reverse(lanelet_sequence_backward.begin(), lanelet_sequence_backward.end());
@@ -889,7 +885,7 @@ lanelet::ConstLanelets RouteHandler::getShoulderLaneletSequenceAfter(
   double length = 0;
   lanelet::ConstLanelet current_lanelet = lanelet;
   std::set<lanelet::Id> searched_ids{};
-  while (length < min_length) {
+  while (rclcpp::ok() && length < min_length) {
     const auto next_lanelet = getFollowingShoulderLanelet(current_lanelet);
     if (!next_lanelet) break;
     lanelet_sequence_forward.push_back(*next_lanelet);
@@ -931,7 +927,7 @@ lanelet::ConstLanelets RouteHandler::getShoulderLaneletSequenceUpTo(
   double length = 0;
   lanelet::ConstLanelet current_lanelet = lanelet;
   std::set<lanelet::Id> searched_ids{};
-  while (length < min_length) {
+  while (rclcpp::ok() && length < min_length) {
     const auto prev_lanelet = getPreviousShoulderLanelet(current_lanelet);
     if (!prev_lanelet) break;
 
@@ -1559,9 +1555,8 @@ std::optional<lanelet::ConstLanelet> RouteHandler::getPullOverTarget(const Pose 
   const auto lanelets_in_range =
     lanelet_map_ptr_->laneletLayer.search(lanelet::BoundingBox2d(p - offset, p + offset));
   for (const auto & lanelet : lanelets_in_range) {
-    const auto is_inside_lanelet =
-      autoware::experimental::lanelet2_utils::is_in_lanelet(goal_pose, lanelet, search_distance);
-    if (is_inside_lanelet && isShoulderLanelet(lanelet)) return lanelet;
+    const auto is_in_lanelet = lanelet::utils::isInLanelet(goal_pose, lanelet, search_distance);
+    if (is_in_lanelet && isShoulderLanelet(lanelet)) return lanelet;
   }
   return std::nullopt;
 }
@@ -1575,9 +1570,8 @@ std::optional<lanelet::ConstLanelet> RouteHandler::getPullOutStartLane(
   const auto lanelets_in_range =
     lanelet_map_ptr_->laneletLayer.search(lanelet::BoundingBox2d(p - offset, p + offset));
   for (const auto & lanelet : lanelets_in_range) {
-    const auto is_inside_lanelet =
-      autoware::experimental::lanelet2_utils::is_in_lanelet(pose, lanelet, search_distance);
-    if (is_inside_lanelet && isShoulderLanelet(lanelet)) return lanelet;
+    const auto is_in_lanelet = lanelet::utils::isInLanelet(pose, lanelet, search_distance);
+    if (is_in_lanelet && isShoulderLanelet(lanelet)) return lanelet;
   }
   return std::nullopt;
 }
@@ -2135,8 +2129,7 @@ bool RouteHandler::planPathLaneletsBetweenCheckpoints(
   const auto findGoalClosestPreferredLanelet = [&]() -> std::optional<lanelet::ConstLanelet> {
     if (const auto closest_lanelet = getClosestPreferredLaneletWithinRoute(goal_checkpoint)) {
       if (std::find(candidates.begin(), candidates.end(), closest_lanelet) != candidates.end()) {
-        if (autoware::experimental::lanelet2_utils::is_in_lanelet(
-              goal_checkpoint, closest_lanelet.value())) {
+        if (lanelet::utils::isInLanelet(goal_checkpoint, closest_lanelet.value())) {
           return closest_lanelet;
         }
       }
@@ -2144,8 +2137,7 @@ bool RouteHandler::planPathLaneletsBetweenCheckpoints(
     lanelet::ConstLanelet closest_lanelet;
     if (getClosestLaneletWithinRoute(goal_checkpoint, &closest_lanelet)) {
       if (std::find(candidates.begin(), candidates.end(), closest_lanelet) != candidates.end()) {
-        if (autoware::experimental::lanelet2_utils::is_in_lanelet(
-              goal_checkpoint, closest_lanelet)) {
+        if (lanelet::utils::isInLanelet(goal_checkpoint, closest_lanelet)) {
           std::stringstream preferred_lanelets_str;
           for (const auto & preferred_lanelet : preferred_lanelets_) {
             preferred_lanelets_str << preferred_lanelet.id() << ", ";
