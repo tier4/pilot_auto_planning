@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef AUTOWARE__TRAJECTORY_VALIDATOR__DETAIL__VALIDATOR_CONTEXT_HPP_
-#define AUTOWARE__TRAJECTORY_VALIDATOR__DETAIL__VALIDATOR_CONTEXT_HPP_
+#ifndef AUTOWARE__TRAJECTORY_VALIDATOR__EVALUATION_CONTEXT_HPP_
+#define AUTOWARE__TRAJECTORY_VALIDATOR__EVALUATION_CONTEXT_HPP_
 
 #include <autoware_perception_msgs/msg/predicted_objects.hpp>
 #include <autoware_perception_msgs/msg/traffic_light_group_array.hpp>
@@ -28,8 +28,11 @@
 namespace autoware::trajectory_validator
 {
 
-/** @brief World state snapshot passed to each validator plugin. */
-struct ValidatorContext
+/**
+ * @brief A read-only snapshot of the world state for a single validation stage execution.
+ * Callees receive it by `const &` and must not mutate fields.
+ */
+struct EvaluationContext
 {
   nav_msgs::msg::Odometry::ConstSharedPtr odometry;
   geometry_msgs::msg::AccelWithCovarianceStamped::ConstSharedPtr acceleration;
@@ -40,7 +43,9 @@ struct ValidatorContext
   autoware_planning_msgs::msg::LaneletRoute::ConstSharedPtr route;
 };
 
-using FilterContext = ValidatorContext;
+// Alias to maintain backward compatibility with existing validator plugins
+using FilterContext = EvaluationContext;
+
 }  // namespace autoware::trajectory_validator
 
-#endif  // AUTOWARE__TRAJECTORY_VALIDATOR__DETAIL__VALIDATOR_CONTEXT_HPP_
+#endif  // AUTOWARE__TRAJECTORY_VALIDATOR__EVALUATION_CONTEXT_HPP_
