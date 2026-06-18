@@ -36,11 +36,9 @@ ament_auto_add_library(autoware_trajectory_optimizer_component SHARED
   src/utils.cpp
 )
 
-autoware_agnocast_wrapper_register_node(autoware_trajectory_optimizer_component
+rclcpp_components_register_node(autoware_trajectory_optimizer_component
   PLUGIN "autoware::trajectory_optimizer::TrajectoryOptimizer"
   EXECUTABLE autoware_trajectory_optimizer_node
-  ROS2_EXECUTOR SingleThreadedExecutor
-  AGNOCAST_EXECUTOR CallbackIsolatedAgnocastExecutor
 )
 
 ament_auto_add_library(autoware_trajectory_optimizer_plugins SHARED

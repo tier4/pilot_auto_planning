@@ -98,8 +98,7 @@ void ObstacleStop::on_initialize(const TrajectoryModifierParams & params)
       {utils::obstacle_stop::ObjectType::TRAILER, p.object_decel.trailer},
       {utils::obstacle_stop::ObjectType::MOTORCYCLE, p.object_decel.motorcycle},
       {utils::obstacle_stop::ObjectType::BICYCLE, p.object_decel.bicycle},
-      {utils::obstacle_stop::ObjectType::PEDESTRIAN, p.object_decel.pedestrian},
-      {utils::obstacle_stop::ObjectType::ANIMAL, p.object_decel.animal}};
+      {utils::obstacle_stop::ObjectType::PEDESTRIAN, p.object_decel.pedestrian}};
   }
 }
 
@@ -147,8 +146,7 @@ void ObstacleStop::update_params(const TrajectoryModifierParams & params)
       {utils::obstacle_stop::ObjectType::TRAILER, p.object_decel.trailer},
       {utils::obstacle_stop::ObjectType::MOTORCYCLE, p.object_decel.motorcycle},
       {utils::obstacle_stop::ObjectType::BICYCLE, p.object_decel.bicycle},
-      {utils::obstacle_stop::ObjectType::PEDESTRIAN, p.object_decel.pedestrian},
-      {utils::obstacle_stop::ObjectType::ANIMAL, p.object_decel.animal}};
+      {utils::obstacle_stop::ObjectType::PEDESTRIAN, p.object_decel.pedestrian}};
   }
 }
 
@@ -229,8 +227,17 @@ bool ObstacleStop::set_stop_point(TrajectoryPoints & traj_points, const InputDat
     target_stop_point_arc_length < stopping_params_.arrived_distance_threshold ||
     !utils::insert_stop_point(
       traj_points, target_stop_point_arc_length, debug_data_.trajectory_shape.trajectory_length)) {
-    utils::replace_trajectory_with_stop_point(
-      traj_points, input.current_odometry->pose.pose, trajectory_time_step_);
+    traj_points = std::invoke([&]() {
+      TrajectoryPoints stop_points;
+      auto p = traj_points.front();
+      p.longitudinal_velocity_mps = 0.0;
+      p.acceleration_mps2 = 0.0;
+      p.time_from_start = rclcpp::Duration::from_seconds(0.0);
+      stop_points.push_back(p);
+      p.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_step_);
+      stop_points.push_back(p);
+      return stop_points;
+    });
   }
 
   const auto & stop_pose = traj_points.back().pose;

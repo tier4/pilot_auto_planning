@@ -1,5 +1,10 @@
 # This message represents a metric report from a trajectory validator.
 
+# Possible levels for a metric report.
+uint8 OK = 0
+uint8 WARN = 1
+uint8 ERROR = 2
+
 # The name of the validator that generated this report.
 string validator_name
 # The category of the validator that generated this report.
@@ -8,5 +13,5 @@ string validator_category
 string metric_name
 # The value of the metric that was reported.
 float64 metric_value
-# The risk severity of the metric report.
-RiskLevel risk
+# The level of the metric report.
+uint8 level

@@ -22,7 +22,6 @@
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>
 #include <tl_expected/expected.hpp>
 
-#include <autoware_internal_planning_msgs/msg/candidate_trajectory.hpp>
 #include <autoware_internal_planning_msgs/msg/planning_factor_array.hpp>
 #include <autoware_planning_msgs/msg/trajectory_point.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -37,10 +36,8 @@ namespace autoware::trajectory_validator::plugin
 using autoware_planning_msgs::msg::TrajectoryPoint;
 using TrajectoryPoints = std::vector<TrajectoryPoint>;
 using VehicleInfo = autoware::vehicle_info_utils::VehicleInfo;
-using autoware_internal_planning_msgs::msg::CandidateTrajectory;
 using autoware_internal_planning_msgs::msg::PlanningFactorArray;
 using autoware_trajectory_validator::msg::MetricReport;
-using autoware_trajectory_validator::msg::RiskLevel;
 
 /** @brief Result of a single plugin's feasibility check. */
 struct ValidationResult
@@ -74,7 +71,7 @@ public:
    * @param context Current world state snapshot.
    */
   virtual result_t is_feasible(
-    const CandidateTrajectory & candidate_trajectory, const FilterContext & context) = 0;
+    const TrajectoryPoints & traj_points, const FilterContext & context) = 0;
 
   /**
    * @brief Updates the plugin's internal configuration from the latest parameter values.
@@ -92,8 +89,7 @@ public:
   }
 
   /**
-   * @brief Sets whether this plugin runs in shadow mode (results logged but do not affect
-   * trajectory selection).
+   * @brief Sets whether this plugin runs in shadow mode (results logged but not enforced).
    * @param is_shadow_mode True to enable shadow mode.
    */
   void set_shadow_mode(const bool is_shadow_mode) { is_shadow_mode_ = is_shadow_mode; }

@@ -177,9 +177,7 @@ protected:
     const std::vector<TrajectoryPoint> & points, const bool expected_feasible,
     const std::string & message = "")
   {
-    autoware_internal_planning_msgs::msg::CandidateTrajectory candidate_trajectory;
-    candidate_trajectory.points = points;
-    const auto res = filter_->is_feasible(candidate_trajectory, context_);
+    const auto res = filter_->is_feasible(points, context_);
     ASSERT_TRUE(res.has_value()) << "is_feasible should not return an error";
     EXPECT_EQ(res->is_feasible, expected_feasible) << message;
   }
@@ -204,9 +202,7 @@ TEST_F(TrafficLightFilterTest, IsInfeasibleWithoutMapAndSignals)
   const auto points = create_trajectory(0.0, 1.0);
   context_.lanelet_map = nullptr;
   context_.traffic_light_signals = nullptr;
-  autoware_internal_planning_msgs::msg::CandidateTrajectory candidate_trajectory;
-  candidate_trajectory.points = points;
-  EXPECT_FALSE(filter_->is_feasible(candidate_trajectory, context_))
+  EXPECT_FALSE(filter_->is_feasible(points, context_))
     << "Should not be feasible without a map or traffic light signals";
 }
 TEST_F(TrafficLightFilterTest, IsInfeasibleWithoutMap)
@@ -215,9 +211,7 @@ TEST_F(TrafficLightFilterTest, IsInfeasibleWithoutMap)
   // dummy map and light signal
   context_.lanelet_map = nullptr;
   set_traffic_light_signal(0, TrafficLightElement::RED);
-  autoware_internal_planning_msgs::msg::CandidateTrajectory candidate_trajectory;
-  candidate_trajectory.points = points;
-  EXPECT_FALSE(filter_->is_feasible(candidate_trajectory, context_))
+  EXPECT_FALSE(filter_->is_feasible(points, context_))
     << "Should not be feasible without a map (cannot verify whether a trajectory crosses a traffic "
        "light)";
 }
@@ -226,9 +220,7 @@ TEST_F(TrafficLightFilterTest, IsInfeasibleWithoutSignals)
   auto points = create_trajectory(0.0, 1.0);
   create_and_set_map(0, 0);
   context_.traffic_light_signals = nullptr;
-  autoware_internal_planning_msgs::msg::CandidateTrajectory candidate_trajectory;
-  candidate_trajectory.points = points;
-  EXPECT_FALSE(filter_->is_feasible(candidate_trajectory, context_))
+  EXPECT_FALSE(filter_->is_feasible(points, context_))
     << "Should not be feasible without traffic light signals (cannot verify whether a trajectory "
        "crosses a traffic "
        "light)";
@@ -238,9 +230,7 @@ TEST_F(TrafficLightFilterTest, IsInfeasibleWithoutRoute)
   auto points = create_trajectory(0.0, 1.0);
   create_and_set_map(0, 0);
   context_.route = nullptr;
-  autoware_internal_planning_msgs::msg::CandidateTrajectory candidate_trajectory;
-  candidate_trajectory.points = points;
-  EXPECT_FALSE(filter_->is_feasible(candidate_trajectory, context_).has_value())
+  EXPECT_FALSE(filter_->is_feasible(points, context_).has_value())
     << "Should not be feasible without a route";
 }
 

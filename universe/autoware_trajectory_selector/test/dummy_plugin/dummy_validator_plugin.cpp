@@ -32,9 +32,8 @@ public:
   DummyFilter() : ValidatorInterface("DummyFilter") {}
 
   result_t is_feasible(
-    const CandidateTrajectory & candidate_trajectory, const FilterContext & /*context*/) final
+    const TrajectoryPoints & traj_points, const FilterContext & /*context*/) final
   {
-    const auto & traj_points = candidate_trajectory.points;
     if (traj_points.empty()) {
       return tl::make_unexpected("Empty trajectory");
     }

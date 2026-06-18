@@ -66,17 +66,14 @@ enum class ObjectType : uint8_t {
   TRAILER,
   MOTORCYCLE,
   BICYCLE,
-  PEDESTRIAN,
-  ANIMAL,
-  HAZARD
+  PEDESTRIAN
 };
 
 inline static const std::unordered_map<std::string, ObjectType> string_to_object_type = {
   {"unknown", ObjectType::UNKNOWN}, {"car", ObjectType::CAR},
   {"truck", ObjectType::TRUCK},     {"bus", ObjectType::BUS},
   {"trailer", ObjectType::TRAILER}, {"motorcycle", ObjectType::MOTORCYCLE},
-  {"bicycle", ObjectType::BICYCLE}, {"pedestrian", ObjectType::PEDESTRIAN},
-  {"animal", ObjectType::ANIMAL},   {"hazard", ObjectType::HAZARD}};
+  {"bicycle", ObjectType::BICYCLE}, {"pedestrian", ObjectType::PEDESTRIAN}};
 
 inline static const std::unordered_map<uint8_t, ObjectType> classification_to_object_type = {
   {ObjectClassification::UNKNOWN, ObjectType::UNKNOWN},
@@ -86,9 +83,7 @@ inline static const std::unordered_map<uint8_t, ObjectType> classification_to_ob
   {ObjectClassification::TRAILER, ObjectType::TRAILER},
   {ObjectClassification::MOTORCYCLE, ObjectType::MOTORCYCLE},
   {ObjectClassification::BICYCLE, ObjectType::BICYCLE},
-  {ObjectClassification::PEDESTRIAN, ObjectType::PEDESTRIAN},
-  {ObjectClassification::ANIMAL, ObjectType::ANIMAL},
-  {ObjectClassification::HAZARD, ObjectType::HAZARD}};
+  {ObjectClassification::PEDESTRIAN, ObjectType::PEDESTRIAN}};
 
 struct CollisionPoint
 {

@@ -127,8 +127,7 @@ private:
     std::vector<CollisionPoint> & collision_points_buffer, const TrajectoryPoints & traj_points,
     const std::optional<CollisionPoint> & collision_point);
 
-  std::optional<CollisionPoint> get_nearest_collision_point(
-    const std::vector<CollisionPoint> & collision_points_buffer) const;
+  std::optional<CollisionPoint> get_nearest_collision_point() const;
 
   void set_stop_point(TrajectoryPoints & traj_points);
 
