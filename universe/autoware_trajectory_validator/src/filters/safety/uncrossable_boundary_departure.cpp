@@ -22,9 +22,8 @@
 namespace autoware::trajectory_validator::plugin::safety
 {
 UncrossableBoundaryDepartureFilter::result_t UncrossableBoundaryDepartureFilter::is_feasible(
-  const CandidateTrajectory & candidate_trajectory, const FilterContext & context)
+  const TrajectoryPoints & traj_points, const FilterContext & context)
 {
-  const auto & traj_points = candidate_trajectory.points;
   if (const auto validate_context = validate_filter_context(context); !validate_context) {
     return tl::make_unexpected(validate_context.error());
   }
@@ -40,11 +39,7 @@ UncrossableBoundaryDepartureFilter::result_t UncrossableBoundaryDepartureFilter:
   ego_state.acceleration = context.acceleration->accel.accel.linear.x;
   ego_state.current_time_s = rclcpp::Time(context.odometry->header.stamp).seconds();
 
-  // Evaluate each generator's trajectory against its own hysteresis state so that a critical
-  // verdict for one trajectory does not bleed into another through the shared ON/OFF buffers.
-  auto & hysteresis_state = hysteresis_states_[candidate_trajectory.generator_id.uuid];
-
-  auto status = checker_->update_departure_status(traj_points, ego_state, hysteresis_state);
+  auto status = checker_->update_departure_status(traj_points, ego_state);
 
   const bool is_feasible = status.status != boundary_departure_checker::DepartureType::CRITICAL;
 
@@ -54,14 +49,13 @@ UncrossableBoundaryDepartureFilter::result_t UncrossableBoundaryDepartureFilter:
       std::back_inserter(debug_markers_.markers));
   }
 
-  RiskLevel risk_level;
-  risk_level.level = is_feasible ? RiskLevel::SAFE : RiskLevel::DANGER;
-  std::vector<MetricReport> metrics{autoware_trajectory_validator::build<MetricReport>()
-                                      .validator_name(get_name())
-                                      .validator_category(category())
-                                      .metric_name("check_critical_departure")
-                                      .metric_value(is_feasible ? 1.0 : 0.0)
-                                      .risk(risk_level)};
+  std::vector<MetricReport> metrics{
+    autoware_trajectory_validator::build<MetricReport>()
+      .validator_name(get_name())
+      .validator_category(category())
+      .metric_name("check_critical_departure")
+      .metric_value(is_feasible ? 1.0 : 0.0)
+      .level(!is_feasible ? MetricReport::ERROR : MetricReport::OK)};
 
   return ValidationResult{is_feasible, std::move(metrics)};
 }

@@ -21,7 +21,6 @@
 #include <autoware_internal_debug_msgs/msg/float64_stamped.hpp>
 #include <autoware_internal_planning_msgs/msg/scored_candidate_trajectories.hpp>
 #include <autoware_planning_msgs/msg/trajectory.hpp>
-#include <autoware_vehicle_msgs/msg/turn_indicators_command.hpp>
 
 #include <memory>
 
@@ -30,7 +29,6 @@ namespace autoware::trajectory_adapter
 
 using autoware_internal_planning_msgs::msg::ScoredCandidateTrajectories;
 using autoware_planning_msgs::msg::Trajectory;
-using autoware_vehicle_msgs::msg::TurnIndicatorsCommand;
 
 class TrajectoryAdapterNode : public rclcpp::Node
 {
@@ -43,7 +41,6 @@ private:
   rclcpp::Subscription<ScoredCandidateTrajectories>::SharedPtr sub_trajectories_;
 
   rclcpp::Publisher<Trajectory>::SharedPtr pub_trajectory_;
-  rclcpp::Publisher<TurnIndicatorsCommand>::SharedPtr pub_turn_indicators_;
 
   rclcpp::Publisher<autoware_utils_debug::ProcessingTimeDetail>::SharedPtr
     debug_processing_time_detail_pub_;

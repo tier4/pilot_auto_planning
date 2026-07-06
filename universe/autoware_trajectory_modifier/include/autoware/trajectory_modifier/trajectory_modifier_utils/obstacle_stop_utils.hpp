@@ -15,7 +15,6 @@
 #ifndef AUTOWARE__TRAJECTORY_MODIFIER__TRAJECTORY_MODIFIER_UTILS__OBSTACLE_STOP_UTILS_HPP_
 #define AUTOWARE__TRAJECTORY_MODIFIER__TRAJECTORY_MODIFIER_UTILS__OBSTACLE_STOP_UTILS_HPP_
 
-#include <autoware/object_recognition_utils/object_classification.hpp>
 #include <autoware_utils_geometry/boost_geometry.hpp>
 #include <autoware_vehicle_info_utils/vehicle_info.hpp>
 #include <rclcpp/time.hpp>
@@ -67,17 +66,14 @@ enum class ObjectType : uint8_t {
   TRAILER,
   MOTORCYCLE,
   BICYCLE,
-  PEDESTRIAN,
-  ANIMAL,
-  HAZARD
+  PEDESTRIAN
 };
 
 inline static const std::unordered_map<std::string, ObjectType> string_to_object_type = {
   {"unknown", ObjectType::UNKNOWN}, {"car", ObjectType::CAR},
   {"truck", ObjectType::TRUCK},     {"bus", ObjectType::BUS},
   {"trailer", ObjectType::TRAILER}, {"motorcycle", ObjectType::MOTORCYCLE},
-  {"bicycle", ObjectType::BICYCLE}, {"pedestrian", ObjectType::PEDESTRIAN},
-  {"animal", ObjectType::ANIMAL},   {"hazard", ObjectType::HAZARD}};
+  {"bicycle", ObjectType::BICYCLE}, {"pedestrian", ObjectType::PEDESTRIAN}};
 
 inline static const std::unordered_map<uint8_t, ObjectType> classification_to_object_type = {
   {ObjectClassification::UNKNOWN, ObjectType::UNKNOWN},
@@ -87,9 +83,7 @@ inline static const std::unordered_map<uint8_t, ObjectType> classification_to_ob
   {ObjectClassification::TRAILER, ObjectType::TRAILER},
   {ObjectClassification::MOTORCYCLE, ObjectType::MOTORCYCLE},
   {ObjectClassification::BICYCLE, ObjectType::BICYCLE},
-  {ObjectClassification::PEDESTRIAN, ObjectType::PEDESTRIAN},
-  {ObjectClassification::ANIMAL, ObjectType::ANIMAL},
-  {ObjectClassification::HAZARD, ObjectType::HAZARD}};
+  {ObjectClassification::PEDESTRIAN, ObjectType::PEDESTRIAN}};
 
 struct CollisionPoint
 {
@@ -141,8 +135,6 @@ struct TrajectoryShape
   autoware_utils_geometry::Box2d bounding_box;
   double trajectory_length;
   double forward_traj_length;
-
-  [[nodiscard]] double ego_arc_length() const { return trajectory_length - forward_traj_length; }
 };
 
 struct DebugData
@@ -278,10 +270,8 @@ struct ObjectFilter
         [&](const auto & object) {
           if (object.kinematics.initial_twist_with_covariance.twist.linear.x > max_velocity_th_)
             return true;
-          const auto label =
-            object.classification.empty()
-              ? ObjectClassification::UNKNOWN
-              : autoware::object_recognition_utils::getHighestProbLabel(object.classification);
+          const auto & label = object.classification.empty() ? ObjectClassification::UNKNOWN
+                                                             : object.classification.front().label;
           if (classification_to_object_type.count(label) == 0) return true;
           return object_types_.count(classification_to_object_type.at(label)) == 0;
         }),

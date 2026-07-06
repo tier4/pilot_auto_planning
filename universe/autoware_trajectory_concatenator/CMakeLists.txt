@@ -8,32 +8,29 @@ generate_parameter_library(${PROJECT_NAME}_param
   param/parameter_struct.yaml
 )
 
+include_directories(
+  SYSTEM
+)
+
 ament_auto_add_library(${PROJECT_NAME} SHARED
-  src/detail/trajectory_concatenator.cpp
+  src/trajectory_concatenator_node.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
   ${PROJECT_NAME}_param
 )
 
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  find_package(ament_lint_auto REQUIRED)
-  ament_auto_find_test_dependencies()
+target_compile_options(${PROJECT_NAME} PUBLIC
+  -Wno-error=deprecated-declarations
+)
 
-  ament_add_gtest(test_trajectory_concatenator
-    test/test_trajectory_concatenator.cpp
-  )
-  target_link_libraries(test_trajectory_concatenator
-    ${PROJECT_NAME}
-  )
+rclcpp_components_register_node(${PROJECT_NAME}
+  PLUGIN "autoware::trajectory_concatenator::TrajectoryConcatenatorNode"
+  EXECUTABLE ${PROJECT_NAME}_node
+)
 
-  ament_add_gtest(test_trajectory_concatenator_wrapper
-    test/test_trajectory_concatenator_wrapper.cpp
-  )
-  target_link_libraries(test_trajectory_concatenator_wrapper
-    ${PROJECT_NAME}
-  )
-endif()
-
-ament_auto_package()
+ament_auto_package(
+  INSTALL_TO_SHARE
+  config
+  launch
+)

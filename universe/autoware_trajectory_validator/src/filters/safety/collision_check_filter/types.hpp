@@ -17,7 +17,6 @@
 
 #include "parameter.hpp"
 
-#include <autoware_trajectory_validator/msg/risk_level.hpp>
 #include <autoware_utils_geometry/geometry.hpp>
 #include <autoware_utils_uuid/uuid_helper.hpp>
 #include <builtin_interfaces/msg/time.hpp>
@@ -35,7 +34,6 @@
 
 namespace autoware::trajectory_validator::plugin::safety
 {
-using autoware_trajectory_validator::msg::RiskLevel;
 using autoware_utils_geometry::Box2d;
 using autoware_utils_geometry::MultiPoint2d;
 using autoware_utils_geometry::Point2d;
@@ -45,11 +43,11 @@ static constexpr double TIME_INDEX_EPSILON = 1e-3;
 
 struct TrajectoryIdentification
 {
-  std::string classification;
-  builtin_interfaces::msg::Time stamp{};
-  unique_identifier_msgs::msg::UUID uuid{};
-  std::string trajectory_type{};
-  double acceleration{};
+  const std::string classification;
+  const builtin_interfaces::msg::Time stamp{};
+  const unique_identifier_msgs::msg::UUID uuid{};
+  const std::string trajectory_type{};
+  const double acceleration{};
 
   TrajectoryIdentification() = default;
   explicit TrajectoryIdentification(std::string classification)
@@ -76,57 +74,23 @@ struct TrajectoryIdentification
   }
 };
 
-struct CollisionTiming
-{
-  double ttc;
-  double pet;
-};
-
+enum class RiskLevel { SAFE, WARN, ERROR };
 struct CollisionDetail
 {
   TrajectoryIdentification object_identification;
-  CollisionTiming first_collision_timing;
-  CollisionTiming worst_pet_timing;
+  double pet;
+  double ttc;
   std::vector<geometry_msgs::msg::Pose> ego_trajectory;
   std::vector<geometry_msgs::msg::Pose> object_trajectory;
   Polygon2d ego_hull;
   Polygon2d object_hull;
 };
 
-struct DracEvaluation
+struct CollisionEvaluation
 {
-  std::string method;  // todo(takagi): use enum
-  RiskLevel::_level_type risk;
-  std::optional<double> ego_drac_acceleration;
+  RiskLevel risk;
   CollisionDetail detail;
 };
-
-struct DracArtifact
-{
-  RiskLevel::_level_type risk{RiskLevel::SAFE};
-  std::vector<DracEvaluation> evaluations{};
-
-  void merge(DracArtifact && other)
-  {
-    if (other.risk > risk) {
-      risk = other.risk;
-    }
-
-    evaluations.reserve(evaluations.size() + other.evaluations.size());
-    for (auto & evaluation : other.evaluations) {
-      evaluations.push_back(std::move(evaluation));
-    }
-  }
-
-  void merge(DracEvaluation && element)
-  {
-    if (element.risk > risk) {
-      risk = element.risk;
-    }
-    evaluations.push_back(std::move(element));
-  }
-};
-
 struct RssDetail
 {
   TrajectoryIdentification object_identification;
@@ -135,36 +99,55 @@ struct RssDetail
 
 struct RssEvaluation
 {
-  RiskLevel::_level_type risk;
+  RiskLevel risk;
   RssDetail detail;
+};
+
+struct DracArtifact
+{
+  RiskLevel risk{RiskLevel::SAFE};
+  std::optional<double> required_acceleration;
+  std::vector<CollisionEvaluation> object_evaluations;
+};
+
+struct PetArtifact
+{
+  RiskLevel risk{RiskLevel::SAFE};
+  std::vector<CollisionEvaluation> object_evaluations;
 };
 
 struct RssArtifact
 {
-  RiskLevel::_level_type risk{RiskLevel::SAFE};
+  RiskLevel risk{RiskLevel::SAFE};
   std::vector<RssEvaluation> object_evaluations;
 };
 
 template <typename Container>
-RiskLevel::_level_type calc_worst_risk(const Container & evaluations)
+RiskLevel calc_worst_risk(const Container & evaluations)
 {
-  RiskLevel::_level_type worst = RiskLevel::SAFE;
+  RiskLevel worst = RiskLevel::SAFE;
 
   for (const auto & eval : evaluations) {
     if (eval.risk > worst) {
       worst = eval.risk;
     }
+    if (worst == RiskLevel::ERROR) {
+      break;
+    }
   }
   return worst;
 }
 
-inline RiskLevel::_level_type calc_worst_risk(std::initializer_list<RiskLevel::_level_type> risks)
+inline RiskLevel calc_worst_risk(std::initializer_list<RiskLevel> risks)
 {
-  RiskLevel::_level_type worst = RiskLevel::SAFE;
+  RiskLevel worst = RiskLevel::SAFE;
 
   for (const auto & risk : risks) {
     if (risk > worst) {
       worst = risk;
+    }
+    if (worst == RiskLevel::ERROR) {
+      break;
     }
   }
   return worst;
