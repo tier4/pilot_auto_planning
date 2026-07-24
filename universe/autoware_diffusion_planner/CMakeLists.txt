@@ -187,7 +187,6 @@ if(TRT_AVAIL AND CUDA_AVAIL)
     )
   endif()
 endif()
-
 ament_auto_package(
   INSTALL_TO_SHARE
   config

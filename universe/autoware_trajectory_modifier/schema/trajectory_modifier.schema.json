@@ -209,46 +209,28 @@
             "objects": {
               "type": "object",
               "properties": {
-                "target_objects": {
-                  "type": "object",
-                  "properties": {
-                    "bbox": {
-                      "type": "array",
-                      "description": "Types of bounding box shaped objects to consider for obstacle stop",
-                      "default": [
-                        "car",
-                        "truck",
-                        "bus",
-                        "trailer",
-                        "motorcycle",
-                        "bicycle",
-                        "pedestrian",
-                        "hazard",
-                        "unknown"
-                      ],
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "polygon": {
-                      "type": "array",
-                      "description": "Types of polygon shaped objects to consider for obstacle stop",
-                      "default": [
-                        "car",
-                        "truck",
-                        "bus",
-                        "trailer",
-                        "pedestrian",
-                        "hazard",
-                        "unknown"
-                      ],
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [],
-                  "additionalProperties": false
+                "object_types": {
+                  "type": "array",
+                  "description": "Object types to consider for obstacle stop",
+                  "default": [
+                    "car",
+                    "truck",
+                    "bus",
+                    "trailer",
+                    "motorcycle",
+                    "bicycle",
+                    "pedestrian",
+                    "hazard"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "max_velocity_th": {
+                  "type": "number",
+                  "description": "Maximum velocity threshold for target object [m/s]",
+                  "default": 5.0,
+                  "minimum": 0.0
                 },
                 "stopped_velocity_th": {
                   "type": "number",
@@ -489,12 +471,6 @@
               "default": 0.0,
               "minimum": 0.0
             },
-            "min_lookahead_distance": {
-              "type": "number",
-              "description": "Minimum forward trajectory length to scan for traffic light stop lines even at low ego speed [m]",
-              "default": 20.0,
-              "minimum": 0.0
-            },
             "th_stable_duration_red": {
               "type": "number",
               "description": "Threshold for stable duration of red light [s]",
@@ -536,48 +512,13 @@
               "description": "Enable the use of pointcloud for surround obstacle stop",
               "default": true
             },
-            "target_objects": {
-              "type": "object",
-              "properties": {
-                "bbox": {
-                  "type": "array",
-                  "description": "Types of bounding box shaped objects to consider for surround obstacle stop",
-                  "default": [
-                    "car",
-                    "truck",
-                    "bus",
-                    "trailer",
-                    "motorcycle",
-                    "bicycle",
-                    "pedestrian",
-                    "hazard",
-                    "animal",
-                    "unknown"
-                  ],
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "polygon": {
-                  "type": "array",
-                  "description": "Types of polygon shaped objects to consider for surround obstacle stop",
-                  "default": [
-                    "car",
-                    "truck",
-                    "bus",
-                    "trailer",
-                    "pedestrian",
-                    "hazard",
-                    "animal",
-                    "unknown"
-                  ],
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              },
-              "required": [],
-              "additionalProperties": false
+            "object_types": {
+              "type": "array",
+              "description": "Types of objects to consider for surround obstacle stop",
+              "default": ["car", "truck", "bus", "trailer", "motorcycle", "bicycle", "pedestrian"],
+              "items": {
+                "type": "string"
+              }
             },
             "front_distance_th": {
               "type": "object",

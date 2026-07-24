@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -33,7 +32,6 @@ using autoware_trajectory_validator::msg::ValidationReport;
 
 TrajectoryValidatorReport TrajectoryValidator::process(
   const autoware_internal_planning_msgs::msg::CandidateTrajectories & input_trajectories,
-  const std::unordered_set<std::string> & active_filter_names,
   const ValidatorContext & context) const
 {
   TrajectoryValidatorReport report;
@@ -104,14 +102,8 @@ TrajectoryValidatorReport TrajectoryValidator::process(
       report.num_feasible_trajectories++;
     }
 
-    // only consider metrics from active filters for final trajectory risk level
-    std::vector<autoware_trajectory_validator::msg::MetricReport> active_metrics;
-    std::copy_if(
-      combined_metrics.begin(), combined_metrics.end(), std::back_inserter(active_metrics),
-      [&](const auto & metric) { return active_filter_names.count(metric.validator_name) > 0; });
-
     RiskLevel risk_level;
-    risk_level.level = worst_risk_level(active_metrics);
+    risk_level.level = worst_risk_level(combined_metrics);
     report.validation_reports.push_back(
       autoware_trajectory_validator::build<ValidationReport>()
         .trajectory_stamp(candidate_trajectory.header.stamp)

@@ -34,14 +34,12 @@ target_compile_options(${trajectory_validator_lib_target} PUBLIC
 
 ament_auto_add_library(autoware_trajectory_validator_plugins SHARED
   src/filters/safety/uncrossable_boundary_departure.cpp
-  src/filters/safety/trajectory_feasibility_filter.cpp
-  src/filters/safety/collision_check_filter/collision_check_filter.cpp
+  src/filters/safety/vehicle_constraint_filter.cpp
+    src/filters/safety/collision_check_filter/collision_check_filter.cpp
   src/filters/safety/collision_check_filter/reporter.cpp
   src/filters/safety/collision_check_filter/assessment.cpp
-  src/filters/safety/collision_check_filter/stop_tracker.cpp
   src/filters/safety/collision_check_filter/trajectory_utils.cpp
   src/filters/traffic_rule/traffic_light_filter.cpp
-  src/filters/traffic_rule/crosswalk_filter.cpp
 )
 
 set_target_properties(autoware_trajectory_validator_plugins PROPERTIES CXX_VISIBILITY_PRESET default)
@@ -83,10 +81,10 @@ if(BUILD_TESTING)
   # ==========================================
   # 1. Plugin Unit Tests
   # ==========================================
-  ament_add_gtest(test_trajectory_feasibility_filter
-    test/plugins/test_trajectory_feasibility_filter.cpp
+  ament_add_gtest(test_vehicle_constraint_filter
+    test/plugins/test_vehicle_constraint_filter.cpp
   )
-  target_link_libraries(test_trajectory_feasibility_filter
+  target_link_libraries(test_vehicle_constraint_filter
     autoware_trajectory_validator_plugins
   )
 
@@ -108,13 +106,6 @@ if(BUILD_TESTING)
     test/plugins/collision_check_filter/test_geometry.cpp
   )
   target_link_libraries(test_geometry
-    autoware_trajectory_validator_plugins
-  )
-
-  ament_add_gtest(test_stop_tracker
-    test/plugins/collision_check_filter/test_stop_tracker.cpp
-  )
-  target_link_libraries(test_stop_tracker
     autoware_trajectory_validator_plugins
   )
 
@@ -143,13 +134,6 @@ if(BUILD_TESTING)
     test/plugins/test_traffic_light_filter.cpp
   )
   target_link_libraries(test_traffic_light_filter
-    autoware_trajectory_validator_plugins
-  )
-
-  ament_add_gtest(test_crosswalk_filter
-    test/plugins/test_crosswalk_filter.cpp
-  )
-  target_link_libraries(test_crosswalk_filter
     autoware_trajectory_validator_plugins
   )
 
