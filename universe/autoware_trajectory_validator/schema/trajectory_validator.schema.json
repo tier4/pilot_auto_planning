@@ -409,7 +409,9 @@
                 },
                 "ego_footprint_margin": { "$ref": "#/definitions/ego_footprint_margin" },
                 "object_assumed_acceleration": {
-                  "$ref": "#/definitions/labeled_double"
+                  "type": "number",
+                  "description": "Assumed object acceleration for RSS calculation (negative, m/s²).",
+                  "default": -1.0
                 },
                 "error_threshold": {
                   "type": "object",

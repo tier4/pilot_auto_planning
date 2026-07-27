@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "autoware/trajectory_validator/detail/risk_utils.hpp"
 #include "autoware/trajectory_validator/filters/safety/trajectory_feasibility_filter.hpp"
 
 #include <tf2/LinearMath/Quaternion.hpp>
@@ -124,10 +123,10 @@ TEST(TrajectoryFeasibilityFilterTest, FeasibleWhenAllConstraintsSatisfied)
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_TRUE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenSpeedExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenSpeedExceedsMax)
 {
   // Create a trajectory that exceeds max speed
   TrajectoryPoints traj_points = {
@@ -151,11 +150,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenSpeedExceedsMax)
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(VehicleConstraintFilterTest, HighCautionWhenNearestTrajectoryPointExceedsLaneletSpeedLimit)
+TEST(VehicleConstraintFilterTest, InfeasibleWhenNearestTrajectoryPointExceedsLaneletSpeedLimit)
 {
   TrajectoryPoints traj_points = {
     create_trajectory_point(0.0, 0.0, 0.0, 5.0, 0.0, 0.0),
@@ -185,11 +183,10 @@ TEST(VehicleConstraintFilterTest, HighCautionWhenNearestTrajectoryPointExceedsLa
   const auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenAccelerationExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenAccelerationExceedsMax)
 {
   // Create a trajectory that exceeds max acceleration
   TrajectoryPoints traj_points = {
@@ -213,11 +210,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenAccelerationExceedsMax)
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenDecelerationExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenDecelerationExceedsMax)
 {
   // Create a trajectory that exceeds max deceleration
   TrajectoryPoints traj_points = {
@@ -242,11 +238,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenDecelerationExceedsMax)
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenYawDeviationExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenYawDeviationExceedsMax)
 {
   TrajectoryPoints traj_points = {
     create_trajectory_point(0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0),
@@ -269,11 +264,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenYawDeviationExceedsMax)
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenVelocityDeviationExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenVelocityDeviationExceedsMax)
 {
   TrajectoryPoints traj_points = {
     create_trajectory_point(0.0, 0.0, 0.0, 5.0, 0.0, 0.0),
@@ -296,11 +290,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenVelocityDeviationExceedsMax
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenLateralAccelerationExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenLateralAccelerationExceedsMax)
 {
   TrajectoryPoints traj_points = {
     create_trajectory_point(0.0, 0.0, 0.0, 10.0, 0.0, 0.0),
@@ -325,11 +318,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenLateralAccelerationExceedsM
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenDistanceDeviationExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenDistanceDeviationExceedsMax)
 {
   TrajectoryPoints traj_points = {
     create_trajectory_point(0.0, 0.0, 0.0, 5.0, 0.0, 0.0),
@@ -353,11 +345,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenDistanceDeviationExceedsMax
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenSteeringAngleExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenSteeringAngleExceedsMax)
 {
   // Create a trajectory that exceeds max steering angle after smoothing
   TrajectoryPoints traj_points = {
@@ -385,11 +376,10 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenSteeringAngleExceedsMax)
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
-TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenSteeringRateExceedsMax)
+TEST(TrajectoryFeasibilityFilterTest, InfeasibleWhenSteeringRateExceedsMax)
 {
   // Create a trajectory that exceeds max steering rate after smoothing
   TrajectoryPoints traj_points = {
@@ -419,8 +409,7 @@ TEST(TrajectoryFeasibilityFilterTest, HighCautionWhenSteeringRateExceedsMax)
   auto result = filter.is_feasible(candidate_trajectory, context);
 
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(worst_risk_level(result.value().metrics), RiskLevel::HIGH_CAUTION);
-  EXPECT_TRUE(is_feasible(worst_risk_level(result.value().metrics)));
+  EXPECT_FALSE(result.value().is_feasible);
 }
 
 // --- is_speed_ok(...) tests ---
