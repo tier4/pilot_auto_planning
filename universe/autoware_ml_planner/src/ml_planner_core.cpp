@@ -283,8 +283,7 @@ PlannerOutput MLPlannerCore::create_planner_output(
   PlannerOutput output;
   // Trajectory and CandidateTrajectories
   for (int i = 0; i < params_.batch_size; i++) {
-    auto trajectory = postprocess::create_ego_trajectory(
-      agent_poses, timestamp, kinematic_state.pose.pose.position, i);
+    auto trajectory = postprocess::create_ego_trajectory(agent_poses, timestamp, i);
 
     if (i == 0) {
       // Keep the untouched model output for the debug topics.
