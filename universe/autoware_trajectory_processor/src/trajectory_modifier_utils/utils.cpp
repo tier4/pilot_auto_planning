@@ -75,11 +75,10 @@ bool is_ego_vehicle_moving(const geometry_msgs::msg::Twist & twist, const double
 
 double clamp_stop_point_arc_length(
   const double stop_point_arc_length, const double max_length, const double ego_vel,
-  const double ego_accel, const double decel_limit, const double jerk_limit,
-  const double time_delay)
+  const double ego_accel, const double decel_limit, const double jerk_limit)
 {
   auto min_stopping_distance =
-    motion_utils::calculate_stop_distance(ego_vel, ego_accel, decel_limit, jerk_limit, time_delay);
+    motion_utils::calculate_stop_distance(ego_vel, ego_accel, decel_limit, jerk_limit, 0.0);
   if (!min_stopping_distance) min_stopping_distance = 0.0;
   return std::clamp(stop_point_arc_length, min_stopping_distance.value(), max_length);
 }
