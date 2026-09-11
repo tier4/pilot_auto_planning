@@ -14,7 +14,6 @@
 
 #include "point_cloud_collision_check_filter.hpp"
 
-#include <utility>
 #include <vector>
 
 namespace autoware::trajectory_validator::plugin::safety
@@ -48,14 +47,13 @@ std::vector<pcc::StopObstacle> PointCloudCollisionCheckFilter::calc_obstacle_sto
   return {};
 }
 
-RiskLevel PointCloudCollisionCheckFilter::judge_stop_risk(
+bool PointCloudCollisionCheckFilter::judge_stop_feasibility(
   [[maybe_unused]] const std::vector<pcc::StopObstacle> & stop_obstacles,
   [[maybe_unused]] const geometry_msgs::msg::Twist & twist) const
 {
-  // It is not currently implemented. always return SAFE.
-  RiskLevel risk_level;
-  risk_level.level = RiskLevel::SAFE;
-  return risk_level;
+  // It is not currently implemented. always return true.
+  bool is_feasible = true;
+  return is_feasible;
 }
 
 PointCloudCollisionCheckFilter::result_t PointCloudCollisionCheckFilter::is_feasible(
@@ -72,15 +70,10 @@ PointCloudCollisionCheckFilter::result_t PointCloudCollisionCheckFilter::is_feas
 
   const auto stop_obstacles = calc_obstacle_stop(candidate_trajectory.points);
 
-  std::vector<MetricReport> metrics{
-    autoware_internal_planning_msgs::build<MetricReport>()
-      .validator_name(get_name())
-      .validator_category(category())
-      .metric_name("point_cloud_stop_feasibility")
-      .metric_value(static_cast<double>(stop_obstacles.size()))
-      .risk(judge_stop_risk(stop_obstacles, context.odometry->twist.twist))};
+  ValidationResult result{};
+  result.is_feasible = judge_stop_feasibility(stop_obstacles, context.odometry->twist.twist);
 
-  return ValidationResult{std::move(metrics)};
+  return result;
 }
 
 void PointCloudCollisionCheckFilter::update_parameters(const validator::Params & params)
