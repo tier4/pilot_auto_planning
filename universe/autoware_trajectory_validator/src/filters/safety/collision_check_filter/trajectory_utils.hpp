@@ -321,7 +321,10 @@ bool intersects_sat(const ConvexPolygon & poly_a, const ConvexPolygon & poly_b)
   const auto & ring_a = poly_a.outer();
   const auto & ring_b = poly_b.outer();
 
-  if (ring_a.empty() || ring_b.empty()) {
+  constexpr size_t minimum_closed_convex_ring_size = 3U;
+  if (
+    ring_a.size() < minimum_closed_convex_ring_size ||
+    ring_b.size() < minimum_closed_convex_ring_size) {
     return false;
   }
 
@@ -329,17 +332,8 @@ bool intersects_sat(const ConvexPolygon & poly_a, const ConvexPolygon & poly_b)
          !detail::has_separating_axis(ring_b, ring_a, ring_b);
 }
 
-// Vertices of the object footprint in the object local frame, as an open ring (the first vertex is
-// not repeated at the end). Without `use_extra_polygon` this is the outline that `shape.type`
-// defines. With it, a BOUNDING_BOX or CYLINDER outline is replaced by its convex hull with the
-// perception footprint that `shape` carries; a POLYGON is outlined by that footprint already, which
-// upstream delivers convex, and is handed over untouched either way.
-std::vector<Point2d> create_base_polygon(
-  const autoware_perception_msgs::msg::Shape & shape, bool use_extra_polygon);
-
 Polygon2d to_polygon2d(
-  const geometry_msgs::msg::Pose & pose, const autoware_perception_msgs::msg::Shape & shape,
-  bool use_extra_polygon);
+  const geometry_msgs::msg::Pose & pose, const autoware_perception_msgs::msg::Shape & shape);
 }  // namespace autoware::trajectory_validator::plugin::safety::geometry
 
 namespace autoware::trajectory_validator::plugin::safety::trajectory
