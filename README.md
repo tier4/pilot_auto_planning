@@ -12,16 +12,18 @@ This branch only holds the mirror configuration and its tooling. See the mirror 
 | `awf-latest/core` | `autowarefoundation/autoware_core:main`, planning paths |
 | `awf-latest/launch` | `autowarefoundation/autoware_launch:main`, `autoware_planning_*` |
 | `feat/v0.64/e2e` | `tier4/autoware_universe:feat/v0.64/e2e`, planning paths |
-| `awf-combined-latest` | `feat/v0.64/e2e`, `awf-latest/core`, and `awf-latest/launch` replayed into one linear history |
+| `feat/v0.64/e2e-core` | `tier4/autoware_core:feat/v0.64/e2e`, planning paths |
+| `awf-combined-latest` | `feat/v0.64/e2e`, `feat/v0.64/e2e-core`, and `awf-latest/launch` replayed into one linear history |
 
-The combined branch treats `feat/v0.64/e2e` as the trusted universe-side
-history (not `awf-latest/universe` / AWF `main`). Core and launch are filed
-alongside it; everything else at the root comes from the e2e mirror.
+The combined branch treats the tier4 `feat/v0.64/e2e` forks of
+`autoware_universe` and `autoware_core` as the trusted histories (not AWF
+`main`). Launch stays on `awf-latest/launch`; everything else at the root
+comes from the universe e2e mirror.
 
 ```text
 awf-combined-latest/
-├── universe/                   # from feat/v0.64/e2e
-├── core/                       # from awf-latest/core
+├── universe/                   # from feat/v0.64/e2e (tier4/autoware_universe)
+├── core/                       # from feat/v0.64/e2e-core (tier4/autoware_core)
 ├── launch/
 │   ├── autoware_planning_config/
 │   └── autoware_planning_launch/
