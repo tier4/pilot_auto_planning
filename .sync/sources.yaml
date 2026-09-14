@@ -7,17 +7,19 @@
 #
 # Determinism contract
 # --------------------
-# Both stages below are pure functions of (upstream commit, this file):
+# Per-source mirrors are pure functions of (upstream commit, this file):
 #
-#   1. git-filter-repo rewrites each upstream history. Same input plus same
-#      arguments always yields the same commit ids.
-#   2. tools/combine_history.py replays the filtered histories into one linear
-#      branch. Every replayed commit keeps its original author, committer,
-#      timestamps and message; only its parent is rewritten and its tree is
-#      recomposed. No commit is synthesised, so no wall-clock value ever enters
-#      an object.
+#   git-filter-repo rewrites each upstream history. Same input plus same
+#   arguments always yields the same commit ids, so those branches publish as
+#   fast-forwards. A failed push means reproducibility was lost.
 #
-# Rebuilding from scratch therefore reproduces the published branches exactly.
+# The combined branch is the pure function f(published tip, member tips):
+#
+#   Member commits not yet reflected in the published tip are replayed on top
+#   of it. Resume position is recovered from the tip tree (renamed subtree
+#   oids). Same tip plus same members always yield the same commit ids, so the
+#   push is a fast-forward (or a no-op). --verify checks both the tip tree
+#   against the member tips and that a second build reproduces the commit id.
 
 version: 1
 
@@ -26,9 +28,6 @@ sources:
     upstream: https://github.com/autowarefoundation/autoware_universe.git
     ref: main
     mirror_branch: awf-latest/universe
-    # Kept non-forced on purpose: a failed push is the alarm that tells us the
-    # filtered history stopped being reproducible.
-    force: false
     paths:
       - path: planning/
       - path: .github/
@@ -42,7 +41,6 @@ sources:
     upstream: https://github.com/autowarefoundation/autoware_core.git
     ref: main
     mirror_branch: awf-latest/core
-    force: true
     paths:
       - path: planning/
     message_rules:
@@ -53,7 +51,6 @@ sources:
     upstream: https://github.com/autowarefoundation/autoware_launch.git
     ref: main
     mirror_branch: awf-latest/launch
-    force: true
     paths:
       # autoware_planning_config and autoware_planning_launch. The upstream
       # layout is kept here; the combined branch is where it is filed away.
@@ -66,7 +63,6 @@ sources:
     upstream: https://github.com/tier4/autoware_universe.git
     ref: feat/v0.64/e2e
     mirror_branch: feat/v0.64/e2e
-    force: true
     paths:
       - path: planning/
       - path: .github/
@@ -88,11 +84,11 @@ sources:
 
 combined:
   awf-combined-latest:
-    # Members are replayed into one linear history ordered by committer date.
-    # Ties break on member order then original commit id, so the ordering is
-    # total and stable.
+    # Pending member commits are appended onto the published tip, ordered by
+    # committer date among themselves. Ties break on member order then original
+    # commit id. The result is a deterministic function of (published tip,
+    # member tips) and always fast-forwards.
     order_by: committer_date
-    force: true
     # Both members ship planning/, so each is filed under the name of its
     # upstream. That keeps them disjoint and mirrors the awf-latest/universe
     # and awf-latest/core branch names.

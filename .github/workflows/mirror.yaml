@@ -130,8 +130,8 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
 
       - name: Replay into the combined branch
-        # --verify rebuilds from scratch a second time and fails unless both
-        # builds produce the same commit id.
+        # --verify checks the tip tree against the current member tips, and that
+        # appending from the same published tip is reproducible.
         run: |
           if [ "${DRY_RUN}" = true ]; then
               tools/mirror.py combine "${TARGET}" --work "${RUNNER_TEMP}/combine" \

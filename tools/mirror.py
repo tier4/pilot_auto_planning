@@ -10,9 +10,12 @@
 from the configuration. `combine` reads the already published mirror branches,
 so it never needs an upstream clone and cannot disagree with what was pushed.
 
-Both stages are deterministic. `--verify` re-runs a combine from scratch into a
-second repository and fails unless the two builds agree, which turns the
-determinism contract in sources.yaml into something CI actually checks.
+Publishing never uses --force. Per-source mirrors are pure functions of
+(upstream tip, configuration), so updates are fast-forwards when reproducible.
+The combined branch is the pure function f(published tip, member tips): only
+not-yet-reflected member commits are appended, with resume recovered from the
+tip tree, so the same inputs always yield the same commit ids and the push is
+always a fast-forward (or a no-op).
 """
 
 from __future__ import annotations
@@ -48,20 +51,42 @@ def _fresh_dir(path: str) -> str:
     return path
 
 
-def _push(repo: str, downstream: str, local_ref: str, branch: str, force: bool) -> None:
-    args = ["git", "-C", repo, "push"]
-    if force:
-        args.append("--force")
-    args += [downstream, f"{local_ref}:refs/heads/{branch}"]
-    _run(args)
+# Matched against the remote's rejection message to turn a raw git failure into
+# something that names the thing to change.
+_PUSH_HINTS = (
+    (
+        "cannot lock ref",
+        "the branch name collides with an existing ref; git cannot hold both "
+        "refs/heads/X and refs/heads/X/Y, so the other one has to go first",
+    ),
+    (
+        "Changes must be made through a pull request",
+        "a ruleset requires a pull request for this branch and the pushing "
+        "identity is not one of its bypass actors",
+    ),
+    (
+        "Cannot update this protected ref",
+        "a ruleset protects this branch and the pushing identity is not one of "
+        "its bypass actors",
+    ),
+    (
+        "creations being restricted",
+        "a ruleset forbids creating branches here and the pushing identity is "
+        "not one of its bypass actors",
+    ),
+    (
+        "non-fast-forward",
+        "the published history diverged from this build; force pushes are not "
+        "used, so the local build must fast-forward the published tip",
+    ),
+)
 
 
-def _report_reproducibility(repo: str, downstream: str, branch: str, built: str) -> None:
-    """Say whether the freshly built branch still contains what we published.
+def _published_state(repo: str, downstream: str, branch: str, built: str) -> str:
+    """Classify what publishing `built` to `branch` would do, and say so.
 
-    A fast-forward means every previously published commit id came out the same,
-    which is the determinism contract holding in production. Anything else is a
-    rewrite, and worth shouting about even when the push is allowed to force.
+    A fast-forward means the new tip descends from the published tip. Divergence
+    is a hard error: this repository never force-pushes.
     """
     ref = f"refs/mirror-published/{branch}"
     probe = subprocess.run(
@@ -81,22 +106,52 @@ def _report_reproducibility(repo: str, downstream: str, branch: str, built: str)
     )
     if probe.returncode != 0:
         print(f"  {branch}: not published yet, nothing to compare against")
-        return
+        return "absent"
     published = _capture(["git", "-C", repo, "rev-parse", ref])
     if published == built:
         print(f"  {branch}: unchanged ({built[:12]})")
-        return
+        return "unchanged"
     ancestor = subprocess.run(
         ["git", "-C", repo, "merge-base", "--is-ancestor", published, built],
         check=False,
     )
     if ancestor.returncode == 0:
         print(f"  {branch}: fast-forward from {published[:12]} to {built[:12]}")
-    else:
-        print(
-            f"  {branch}: WARNING history rewritten, {published[:12]} is not an "
-            f"ancestor of {built[:12]}; previously published commit ids changed"
+        return "fast-forward"
+    print(
+        f"  {branch}: ERROR history would diverge, {published[:12]} is not an "
+        f"ancestor of {built[:12]}"
+    )
+    return "diverged"
+
+
+def _publish(repo: str, downstream: str, local_ref: str, branch: str, built: str) -> None:
+    """Push `built` without --force. Divergence fails instead of rewriting."""
+    state = _published_state(repo, downstream, branch, built)
+    if state == "unchanged":
+        print(f"  {branch}: already published, nothing to push")
+        return
+    if state == "diverged":
+        raise RuntimeError(
+            f"{branch}: publishing would rewrite published history; "
+            "force pushes are not used in this repository"
         )
+
+    result = subprocess.run(
+        ["git", "-C", repo, "push", downstream, f"{local_ref}:refs/heads/{branch}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.stderr:
+        print(result.stderr.rstrip())
+    if result.returncode == 0:
+        print(f"  pushed {branch}")
+        return
+    for needle, hint in _PUSH_HINTS:
+        if needle in result.stderr:
+            raise RuntimeError(f"{branch}: push rejected -- {hint}")
+    raise RuntimeError(f"{branch}: push failed ({result.returncode})")
 
 
 def do_mirror(config: sync_config.Config, args: argparse.Namespace) -> int:
@@ -124,6 +179,17 @@ def do_mirror(config: sync_config.Config, args: argparse.Namespace) -> int:
     print(f"filtering {source.name}: git filter-repo {' '.join(filter_args)}")
     _run(["git", "filter-repo", *filter_args], cwd=clone)
 
+    if subprocess.run(
+        ["git", "-C", clone, "rev-parse", "--verify", "--quiet", "HEAD"],
+        check=False,
+        capture_output=True,
+    ).returncode:
+        message = f"{source.name}: the configured paths match nothing in {source.ref}"
+        if not source.optional:
+            raise RuntimeError(message)
+        print(f"  {message}; skipping because the source is marked optional")
+        return 0
+
     tip = _capture(["git", "-C", clone, "rev-parse", "HEAD"])
     count = _capture(["git", "-C", clone, "rev-list", "--count", "HEAD"])
     print(f"  {source.name}: {count} commit(s), tip {tip[:12]}")
@@ -131,14 +197,13 @@ def do_mirror(config: sync_config.Config, args: argparse.Namespace) -> int:
     if not source.mirror_branch:
         print(f"  {source.name}: no mirror_branch configured, not pushing")
         return 0
-    if args.downstream:
-        _report_reproducibility(clone, args.downstream, source.mirror_branch, tip)
     if args.push:
         if not args.downstream:
             raise RuntimeError("--push needs --downstream")
-        _push(clone, args.downstream, "HEAD", source.mirror_branch, source.force)
-        print(f"  pushed {source.mirror_branch}")
+        _publish(clone, args.downstream, "HEAD", source.mirror_branch, tip)
     else:
+        if args.downstream:
+            _published_state(clone, args.downstream, source.mirror_branch, tip)
         print("  dry run, nothing pushed")
     return 0
 
@@ -152,9 +217,10 @@ def _remote_has_branch(downstream: str, branch: str) -> bool:
     return result.returncode == 0
 
 
-def _build_combined(config: sync_config.Config, name: str, repo: str, downstream: str) -> str:
-    target = config.combined[name]
-    members = [
+def _member_specs(
+    config: sync_config.Config, target: sync_config.Combined, downstream: str
+) -> list[MemberSpec]:
+    return [
         MemberSpec(
             name=member.source,
             url=downstream,
@@ -163,8 +229,65 @@ def _build_combined(config: sync_config.Config, name: str, repo: str, downstream
         )
         for member in target.members
     ]
+
+
+def _fetch_published_tip(repo: str, downstream: str, branch: str) -> str | None:
+    """Return the published tip oid, or None when the branch does not exist yet."""
+    ref = f"refs/mirror-published/{branch}"
+    probe = subprocess.run(
+        [
+            "git",
+            "-C",
+            repo,
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "--force",
+            downstream,
+            f"refs/heads/{branch}:{ref}",
+        ],
+        check=False,
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        return None
+    return _capture(["git", "-C", repo, "rev-parse", ref])
+
+
+def _build_combined(
+    config: sync_config.Config,
+    name: str,
+    repo: str,
+    downstream: str,
+    base: str | None,
+) -> str:
+    target = config.combined[name]
+    members = _member_specs(config, target, downstream)
     _run(["git", "init", "--quiet", repo])
-    return combine_history.combine(repo, name, members, target.order_by)
+    if base is not None:
+        fetched = _fetch_published_tip(repo, downstream, name)
+        if fetched != base:
+            raise RuntimeError(
+                f"{name}: published tip changed during verify "
+                f"({base[:12]} -> {fetched[:12] if fetched else 'absent'})"
+            )
+    return combine_history.combine(repo, name, members, target.order_by, base=base)
+
+
+def _verify_combined_content(
+    config: sync_config.Config, name: str, repo: str, downstream: str, built: str
+) -> None:
+    """Fail unless the tip tree matches what the current member tips compose to."""
+    target = config.combined[name]
+    members = _member_specs(config, target, downstream)
+    expected = combine_history.expected_tip_tree(repo, members, target.order_by)
+    actual = _capture(["git", "-C", repo, "rev-parse", f"{built}^{{tree}}"])
+    if actual != expected:
+        raise RuntimeError(
+            f"content check failed: tip tree is {actual[:12]}, "
+            f"member tips compose to {expected[:12]}"
+        )
+    print(f"  {name}: tip tree {actual[:12]} matches the current member tips")
 
 
 def do_combine(config: sync_config.Config, args: argparse.Namespace) -> int:
@@ -173,48 +296,64 @@ def do_combine(config: sync_config.Config, args: argparse.Namespace) -> int:
     if not args.downstream:
         raise RuntimeError("combine needs --downstream to read the mirror branches")
 
-    missing = [
-        config.sources[member.source].mirror_branch
-        for member in config.combined[args.target].members
-        if not _remote_has_branch(
-            args.downstream, config.sources[member.source].mirror_branch or ""
-        )
-    ]
+    target = config.combined[args.target]
+    members, missing = [], []
+    for member in target.members:
+        source = config.sources[member.source]
+        if _remote_has_branch(args.downstream, source.mirror_branch or ""):
+            members.append(member)
+        elif source.optional:
+            # Configured ahead of the upstream change that creates its paths.
+            print(f"  {source.mirror_branch}: not published yet, leaving it out")
+        else:
+            missing.append(source.mirror_branch)
     if missing:
         message = f"{args.target}: member branch(es) not published yet: {', '.join(missing)}"
         if not args.allow_missing_members:
             raise RuntimeError(message)
         print(f"{message}; skipping")
         return 0
+    if len(members) < 2:
+        print(f"{args.target}: fewer than two members are published yet; skipping")
+        return 0
+    target.members = members
 
     work = _fresh_dir(os.path.join(args.work, args.target))
     repo = os.path.join(work, "combined")
-    print(f"building {args.target}")
-    built = _build_combined(config, args.target, repo, args.downstream)
+    _run(["git", "init", "--quiet", repo])
+    base = _fetch_published_tip(repo, args.downstream, args.target)
+    if base is None:
+        print(f"building {args.target} from scratch (not published yet)")
+    else:
+        print(f"building {args.target} by appending onto {base[:12]}")
+
+    built = combine_history.combine(
+        repo,
+        args.target,
+        _member_specs(config, target, args.downstream),
+        target.order_by,
+        base=base,
+    )
     print(f"  {args.target}: tip {built[:12]}")
 
     if args.verify:
+        print(f"verifying {args.target} against current member tips")
+        _verify_combined_content(config, args.target, repo, args.downstream, built)
+        # Same inputs must yield the same commit ids: (published tip or empty, members).
         second = os.path.join(work, "verify")
-        print(f"verifying {args.target} by rebuilding from scratch")
-        again = _build_combined(config, args.target, second, args.downstream)
+        label = f"from {base[:12]}" if base is not None else "from scratch"
+        print(f"verifying {args.target} is reproducible {label}")
+        again = _build_combined(config, args.target, second, args.downstream, base)
         if again != built:
             raise RuntimeError(
                 f"determinism check failed: {built} on the first build, {again} on the second"
             )
         print(f"  {args.target}: reproducible, both builds are {built[:12]}")
 
-    _report_reproducibility(repo, args.downstream, args.target, built)
-
     if args.push:
-        _push(
-            repo,
-            args.downstream,
-            f"refs/heads/{args.target}",
-            args.target,
-            config.combined[args.target].force,
-        )
-        print(f"  pushed {args.target}")
+        _publish(repo, args.downstream, f"refs/heads/{args.target}", args.target, built)
     else:
+        _published_state(repo, args.downstream, args.target, built)
         print("  dry run, nothing pushed")
     return 0
 
