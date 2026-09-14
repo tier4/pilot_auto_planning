@@ -89,11 +89,11 @@ combined:
     # commit id. The result is a deterministic function of (published tip,
     # member tips) and always fast-forwards.
     order_by: committer_date
-    # Both members ship planning/, so each is filed under the name of its
-    # upstream. That keeps them disjoint and mirrors the awf-latest/universe
-    # and awf-latest/core branch names.
+    # The trusted universe-side history is feat/v0.64/e2e (tier4 fork), not
+    # autoware_universe:main. Core and launch are filed alongside it.
+    # Everything else at the root comes from the e2e mirror.
     members:
-      - source: autoware_universe
+      - source: tier4_universe_e2e
         rename:
           planning: universe
       - source: autoware_core

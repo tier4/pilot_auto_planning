@@ -12,17 +12,16 @@ This branch only holds the mirror configuration and its tooling. See the mirror 
 | `awf-latest/core` | `autowarefoundation/autoware_core:main`, planning paths |
 | `awf-latest/launch` | `autowarefoundation/autoware_launch:main`, `autoware_planning_*` |
 | `feat/v0.64/e2e` | `tier4/autoware_universe:feat/v0.64/e2e`, planning paths |
-| `awf-combined-latest` | the three `awf-latest/*` mirrors replayed into one linear history |
+| `awf-combined-latest` | `feat/v0.64/e2e`, `awf-latest/core`, and `awf-latest/launch` replayed into one linear history |
 
-In the combined branch each member is filed under the name of its upstream:
-`universe/` and `core/`, because both ship a `planning/` tree, and `launch/`
-for the launch and configuration packages. Everything else at the root comes
-from `autoware_universe`.
+The combined branch treats `feat/v0.64/e2e` as the trusted universe-side
+history (not `awf-latest/universe` / AWF `main`). Core and launch are filed
+alongside it; everything else at the root comes from the e2e mirror.
 
 ```text
 awf-combined-latest/
-├── universe/                   # autoware_universe planning packages
-├── core/                       # autoware_core planning packages
+├── universe/                   # from feat/v0.64/e2e
+├── core/                       # from awf-latest/core
 ├── launch/
 │   ├── autoware_planning_config/
 │   └── autoware_planning_launch/
