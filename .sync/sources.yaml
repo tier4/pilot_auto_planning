@@ -61,8 +61,8 @@ sources:
 
   tier4_universe_e2e:
     upstream: https://github.com/tier4/autoware_universe.git
-    ref: feat/v0.64/e2e
-    mirror_branch: feat/v0.64/e2e
+    ref: feat/v0.64/e2e_scenario_pass
+    mirror_branch: feat/v0.64/e2e_scenario_pass
     paths:
       - path: planning/
       - path: .github/
@@ -84,10 +84,10 @@ sources:
 
   tier4_core_e2e:
     upstream: https://github.com/tier4/autoware_core.git
-    ref: feat/v0.64/e2e
-    # Sibling of feat/v0.64/e2e: git cannot nest feat/v0.64/e2e/core under the
-    # existing feat/v0.64/e2e branch.
-    mirror_branch: feat/v0.64/e2e-core
+    ref: feat/v0.64/e2e_scenario_pass
+    # Sibling of feat/v0.64/e2e_scenario_pass: git cannot nest
+    # feat/v0.64/e2e_scenario_pass/core under that branch.
+    mirror_branch: feat/v0.64/e2e_scenario_pass-core
     paths:
       - path: planning/
     message_rules:
@@ -105,9 +105,9 @@ combined:
     # commit id. The result is a deterministic function of (published tip,
     # member tips) and always fast-forwards.
     order_by: committer_date
-    # Trusted e2e histories from the tier4 forks, not AWF main. Launch stays
-    # on awf-latest/launch. Everything else at the root comes from the
-    # universe e2e mirror.
+    # Trusted e2e_scenario_pass histories from the tier4 forks, not AWF main.
+    # Launch stays on awf-latest/launch. Root files come from the universe
+    # e2e mirror.
     members:
       - source: tier4_universe_e2e
         rename:
