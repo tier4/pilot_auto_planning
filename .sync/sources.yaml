@@ -50,7 +50,7 @@ sources:
   autoware_launch:
     upstream: https://github.com/autowarefoundation/autoware_launch.git
     ref: main
-    mirror_branch: awf-latest/launch
+    mirror_branch: awf-launch-latest
     # Same layout as pilot_auto_sensing_perception launch/: keep upstream
     # package names; rename autoware_universe_launch/ → launch/ only when combining.
     paths:
@@ -107,7 +107,7 @@ combined:
     # member tips) and always fast-forwards.
     order_by: committer_date
     # Trusted e2e_scenario_pass histories from the tier4 forks, not AWF main.
-    # Launch stays on awf-latest/launch. Root files come from the universe
+    # Launch stays on awf-launch-latest. Root files come from the universe
     # e2e mirror.
     members:
       - source: tier4_universe_e2e
