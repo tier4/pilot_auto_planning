@@ -100,7 +100,7 @@ sources:
         replacement: tier4/autoware_core#\1
 
 combined:
-  awf-combined-latest:
+  e2e-combined-latest:
     # Pending member commits are appended onto the published tip, ordered by
     # committer date among themselves. Ties break on member order then original
     # commit id. The result is a deterministic function of (published tip,
