@@ -51,10 +51,11 @@ sources:
     upstream: https://github.com/autowarefoundation/autoware_launch.git
     ref: main
     mirror_branch: awf-latest/launch
+    # Same layout as pilot_auto_sensing_perception launch/: keep upstream
+    # package names; rename autoware_universe_launch/ → launch/ only when combining.
     paths:
-      # autoware_planning_config and autoware_planning_launch. The upstream
-      # layout is kept here; the combined branch is where it is filed away.
-      - regex: ^autoware_universe_launch/autoware_planning_[^/]+(/.*)?$
+      - path: autoware_universe_launch/autoware_planning_config/
+      - path: autoware_universe_launch/autoware_planning_launch/
     message_rules:
       - pattern: '#(\d+)'
         replacement: autowarefoundation/autoware_launch#\1
