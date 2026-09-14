@@ -15,10 +15,10 @@ This branch only holds the mirror configuration and its tooling. See the mirror 
 | `feat/v0.64/e2e-core` | `tier4/autoware_core:feat/v0.64/e2e`, planning paths |
 | `awf-combined-latest` | `feat/v0.64/e2e`, `feat/v0.64/e2e-core`, and `awf-latest/launch` replayed into one linear history |
 
-The combined branch treats the tier4 `feat/v0.64/e2e` forks of
-`autoware_universe` and `autoware_core` as the trusted histories (not AWF
-`main`). Launch stays on `awf-latest/launch`; everything else at the root
-comes from the universe e2e mirror.
+`autoware_universe` and `autoware_core` in `.sync/sources.yaml` are the
+`feat/v0.64/e2e` lines (tier4 forks). AWF `main` is published separately as
+`awf-latest/*` via `autoware_universe_main` / `autoware_core_main`. Launch
+stays on `awf-latest/launch`; root files come from the universe mirror.
 
 ```text
 awf-combined-latest/

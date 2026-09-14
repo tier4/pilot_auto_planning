@@ -24,42 +24,8 @@
 version: 1
 
 sources:
+  # Trusted line for awf-combined-latest.
   autoware_universe:
-    upstream: https://github.com/autowarefoundation/autoware_universe.git
-    ref: main
-    mirror_branch: awf-latest/universe
-    paths:
-      - path: planning/
-      - path: .github/
-      - path: docs/
-      - regex: ^[^/]*$ # root-level files (LICENSE, NOTICE, .cspell.json, ...)
-    message_rules:
-      - pattern: '#(\d+)'
-        replacement: autowarefoundation/autoware_universe#\1
-
-  autoware_core:
-    upstream: https://github.com/autowarefoundation/autoware_core.git
-    ref: main
-    mirror_branch: awf-latest/core
-    paths:
-      - path: planning/
-    message_rules:
-      - pattern: '#(\d+)'
-        replacement: autowarefoundation/autoware_core#\1
-
-  autoware_launch:
-    upstream: https://github.com/autowarefoundation/autoware_launch.git
-    ref: main
-    mirror_branch: awf-latest/launch
-    paths:
-      # autoware_planning_config and autoware_planning_launch. The upstream
-      # layout is kept here; the combined branch is where it is filed away.
-      - regex: ^autoware_universe_launch/autoware_planning_[^/]+(/.*)?$
-    message_rules:
-      - pattern: '#(\d+)'
-        replacement: autowarefoundation/autoware_launch#\1
-
-  tier4_universe_e2e:
     upstream: https://github.com/tier4/autoware_universe.git
     ref: feat/v0.64/e2e
     mirror_branch: feat/v0.64/e2e
@@ -82,7 +48,7 @@ sources:
       - literal: This reverts commit 8756df69f1ee9241028d10b7f493ed030ee67b1b.
         replacement: This reverts commit 871a8540ade845c7c9a193029d407b411a4d685b.
 
-  tier4_core_e2e:
+  autoware_core:
     upstream: https://github.com/tier4/autoware_core.git
     ref: feat/v0.64/e2e
     # Sibling of feat/v0.64/e2e: git cannot nest feat/v0.64/e2e/core under the
@@ -90,8 +56,6 @@ sources:
     mirror_branch: feat/v0.64/e2e-core
     paths:
       - path: planning/
-    # Commits authored before the fork point still refer to upstream pull
-    # requests; later ones refer to the TIER IV fork.
     message_rules:
       - until: 2026-02-21T00:00:00Z
         pattern: '#(\d+)'
@@ -100,6 +64,42 @@ sources:
         pattern: (?<!autowarefoundation)(?<!autowarefoundation/autoware_core)#(\d+)
         replacement: tier4/autoware_core#\1
 
+  # AWF main mirrors (published separately; not combined members).
+  autoware_universe_main:
+    upstream: https://github.com/autowarefoundation/autoware_universe.git
+    ref: main
+    mirror_branch: awf-latest/universe
+    paths:
+      - path: planning/
+      - path: .github/
+      - path: docs/
+      - regex: ^[^/]*$ # root-level files (LICENSE, NOTICE, .cspell.json, ...)
+    message_rules:
+      - pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_universe#\1
+
+  autoware_core_main:
+    upstream: https://github.com/autowarefoundation/autoware_core.git
+    ref: main
+    mirror_branch: awf-latest/core
+    paths:
+      - path: planning/
+    message_rules:
+      - pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_core#\1
+
+  autoware_launch:
+    upstream: https://github.com/autowarefoundation/autoware_launch.git
+    ref: main
+    mirror_branch: awf-latest/launch
+    paths:
+      # autoware_planning_config and autoware_planning_launch. The upstream
+      # layout is kept here; the combined branch is where it is filed away.
+      - regex: ^autoware_universe_launch/autoware_planning_[^/]+(/.*)?$
+    message_rules:
+      - pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_launch#\1
+
 combined:
   awf-combined-latest:
     # Pending member commits are appended onto the published tip, ordered by
@@ -107,14 +107,13 @@ combined:
     # commit id. The result is a deterministic function of (published tip,
     # member tips) and always fast-forwards.
     order_by: committer_date
-    # Trusted e2e histories from the tier4 forks, not AWF main. Launch stays
-    # on awf-latest/launch. Everything else at the root comes from the
-    # universe e2e mirror.
+    # autoware_universe / autoware_core are the feat/v0.64/e2e lines. Launch
+    # stays on awf-latest/launch. Root files come from the universe mirror.
     members:
-      - source: tier4_universe_e2e
+      - source: autoware_universe
         rename:
           planning: universe
-      - source: tier4_core_e2e
+      - source: autoware_core
         rename:
           planning: core
       - source: autoware_launch
