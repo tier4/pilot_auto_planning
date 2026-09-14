@@ -48,6 +48,10 @@ class Source:
     message_rules: list[MessageRule] = field(default_factory=list)
     mirror_branch: str | None = None
     force: bool = False
+    # An upstream path that does not exist yet. The mirror is skipped instead of
+    # failing, and a combined target leaves the member out, so the mapping can
+    # be configured ahead of the upstream change that creates the path.
+    optional: bool = False
 
 
 @dataclass
@@ -61,7 +65,7 @@ class Combined:
     name: str
     members: list[Member]
     order_by: str = "committer_date"
-    force: bool = True
+    force: bool = False
 
 
 @dataclass
@@ -122,7 +126,7 @@ def _parse_source(name: str, raw: dict[str, Any]) -> Source:
         _parse_message_rule(entry, f"{where}.message_rules[{index}]")
         for index, entry in enumerate(raw.get("message_rules", []))
     ]
-    return Source(
+    source = Source(
         name=name,
         upstream=str(raw["upstream"]),
         ref=str(raw["ref"]),
@@ -130,7 +134,13 @@ def _parse_source(name: str, raw: dict[str, Any]) -> Source:
         message_rules=rules,
         mirror_branch=raw.get("mirror_branch"),
         force=bool(raw.get("force", False)),
+        optional=bool(raw.get("optional", False)),
     )
+    if source.force:
+        raise ConfigError(
+            f"{where}: force pushes are not supported; omit 'force' or set it to false"
+        )
+    return source
 
 
 def _parse_combined(name: str, raw: dict[str, Any], sources: dict[str, Source]) -> Combined:
@@ -153,20 +163,30 @@ def _parse_combined(name: str, raw: dict[str, Any], sources: dict[str, Source]) 
             )
         rename = {str(k): str(v) for k, v in (entry.get("rename") or {}).items()}
         for old, new in rename.items():
-            if "/" in old.strip("/") or "/" in new.strip("/"):
-                raise ConfigError(f"{spot}.rename: only top-level names can be renamed: {old!r}")
+            # The key names a top-level entry of the member, so it cannot be
+            # nested. The value may be, which is how a member that occupies
+            # several top-level directories is filed under one of them.
+            if "/" in old.strip("/"):
+                raise ConfigError(f"{spot}.rename: only a top-level name can be renamed: {old!r}")
+            if not new.strip("/"):
+                raise ConfigError(f"{spot}.rename: {old!r} has an empty destination")
         members.append(Member(source=source_name, rename=rename))
     if len(members) < 2:
         raise ConfigError(f"{where}: needs at least two members")
     order_by = str(raw.get("order_by", "committer_date"))
     if order_by not in ("committer_date", "author_date"):
         raise ConfigError(f"{where}.order_by: must be committer_date or author_date")
-    return Combined(
+    combined = Combined(
         name=name,
         members=members,
         order_by=order_by,
-        force=bool(raw.get("force", True)),
+        force=bool(raw.get("force", False)),
     )
+    if combined.force:
+        raise ConfigError(
+            f"{where}: force pushes are not supported; omit 'force' or set it to false"
+        )
+    return combined
 
 
 def _check_ref_hierarchy(branches: dict[str, str]) -> None:
