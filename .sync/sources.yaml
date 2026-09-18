@@ -47,18 +47,6 @@ sources:
       - pattern: '#(\d+)'
         replacement: autowarefoundation/autoware_core#\1
 
-  autoware_launch:
-    upstream: https://github.com/autowarefoundation/autoware_launch.git
-    ref: main
-    mirror_branch: awf-launch-latest
-    # Same layout as pilot_auto_sensing_perception launch/: keep upstream
-    # package names; rename autoware_universe_launch/ → launch/ only when combining.
-    paths:
-      - path: autoware_universe_launch/autoware_planning_config/
-      - path: autoware_universe_launch/autoware_planning_launch/
-    message_rules:
-      - pattern: '#(\d+)'
-        replacement: autowarefoundation/autoware_launch#\1
 
   tier4_universe_e2e:
     upstream: https://github.com/tier4/autoware_universe.git
@@ -100,15 +88,15 @@ sources:
         replacement: tier4/autoware_core#\1
 
 combined:
-  e2e-combined-latest:
+  # universe/core only (no launch). New name because e2e-combined-latest embeds
+  # AWF-main launch trees and cannot resume without rewriting.
+  tier4-e2e-combined-latest:
     # Pending member commits are appended onto the published tip, ordered by
     # committer date among themselves. Ties break on member order then original
     # commit id. The result is a deterministic function of (published tip,
     # member tips) and always fast-forwards.
     order_by: committer_date
-    # Trusted e2e_scenario_pass histories from the tier4 forks, not AWF main.
-    # Launch stays on awf-launch-latest. Root files come from the universe
-    # e2e mirror.
+    # Trusted e2e_scenario_pass histories from the tier4 forks only.
     members:
       - source: tier4_universe_e2e
         rename:
@@ -116,6 +104,3 @@ combined:
       - source: tier4_core_e2e
         rename:
           planning: core
-      - source: autoware_launch
-        rename:
-          autoware_universe_launch: launch
