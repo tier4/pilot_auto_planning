@@ -1560,7 +1560,7 @@ std::optional<lanelet::ConstLanelet> RouteHandler::getPullOverTarget(const Pose 
     lanelet_map_ptr_->laneletLayer.search(lanelet::BoundingBox2d(p - offset, p + offset));
   for (const auto & lanelet : lanelets_in_range) {
     const auto is_inside_lanelet =
-      autoware::experimental::lanelet2_utils::is_in_lanelet(lanelet, goal_pose, search_distance);
+      autoware::experimental::lanelet2_utils::is_in_lanelet(goal_pose, lanelet, search_distance);
     if (is_inside_lanelet && isShoulderLanelet(lanelet)) return lanelet;
   }
   return std::nullopt;
@@ -1576,7 +1576,7 @@ std::optional<lanelet::ConstLanelet> RouteHandler::getPullOutStartLane(
     lanelet_map_ptr_->laneletLayer.search(lanelet::BoundingBox2d(p - offset, p + offset));
   for (const auto & lanelet : lanelets_in_range) {
     const auto is_inside_lanelet =
-      autoware::experimental::lanelet2_utils::is_in_lanelet(lanelet, pose, search_distance);
+      autoware::experimental::lanelet2_utils::is_in_lanelet(pose, lanelet, search_distance);
     if (is_inside_lanelet && isShoulderLanelet(lanelet)) return lanelet;
   }
   return std::nullopt;
@@ -2136,7 +2136,7 @@ bool RouteHandler::planPathLaneletsBetweenCheckpoints(
     if (const auto closest_lanelet = getClosestPreferredLaneletWithinRoute(goal_checkpoint)) {
       if (std::find(candidates.begin(), candidates.end(), closest_lanelet) != candidates.end()) {
         if (autoware::experimental::lanelet2_utils::is_in_lanelet(
-              closest_lanelet.value(), goal_checkpoint)) {
+              goal_checkpoint, closest_lanelet.value())) {
           return closest_lanelet;
         }
       }
@@ -2145,7 +2145,7 @@ bool RouteHandler::planPathLaneletsBetweenCheckpoints(
     if (getClosestLaneletWithinRoute(goal_checkpoint, &closest_lanelet)) {
       if (std::find(candidates.begin(), candidates.end(), closest_lanelet) != candidates.end()) {
         if (autoware::experimental::lanelet2_utils::is_in_lanelet(
-              closest_lanelet, goal_checkpoint)) {
+              goal_checkpoint, closest_lanelet)) {
           std::stringstream preferred_lanelets_str;
           for (const auto & preferred_lanelet : preferred_lanelets_) {
             preferred_lanelets_str << preferred_lanelet.id() << ", ";
