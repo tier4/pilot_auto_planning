@@ -98,6 +98,7 @@ MissionPlanner::MissionPlanner(const rclcpp::NodeOptions & options)
     declare_parameter<bool>("consider_no_drivable_lanes");
   default_planner_param.check_footprint_inside_lanes =
     declare_parameter<bool>("check_footprint_inside_lanes");
+  default_planner_param.allow_area = declare_parameter<bool>("allow_area", false);
 
   const auto vehicle_info = autoware::vehicle_info_utils::VehicleInfoUtils(*this).getVehicleInfo();
   planner_ = std::make_shared<lanelet2::DefaultPlanner>(default_planner_param, vehicle_info);
