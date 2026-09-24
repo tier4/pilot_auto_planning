@@ -10,9 +10,11 @@ ament_auto_add_library(${PROJECT_NAME} SHARED
 
 if(BUILD_TESTING)
   ament_add_ros_isolated_gtest(test_autoware_route_handler
-    test/test_route_handler.cpp)
+    test/test_route_handler.cpp
+    test/test_allow_area_route_handler.cpp)
 
   ament_target_dependencies(test_autoware_route_handler
+    autoware_lanelet2_utils
     autoware_test_utils
   )
 

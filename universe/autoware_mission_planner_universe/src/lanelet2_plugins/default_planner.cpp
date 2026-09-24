@@ -91,6 +91,7 @@ DefaultPlanner::DefaultPlanner(
   const autoware::vehicle_info_utils::VehicleInfo & vehicle_info)
 : vehicle_info_(vehicle_info), is_graph_ready_(false), param_(param)
 {
+  route_handler_.setAllowArea(param_.allow_area);
 }
 
 void DefaultPlanner::set_map(const LaneletMapBin & msg)
