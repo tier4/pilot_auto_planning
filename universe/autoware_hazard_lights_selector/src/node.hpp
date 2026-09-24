@@ -16,7 +16,6 @@
 #define NODE_HPP_
 
 // include
-#include <autoware/agnocast_wrapper/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <autoware_vehicle_msgs/msg/hazard_lights_command.hpp>
@@ -29,7 +28,7 @@ struct Parameters
   int update_rate;  // [Hz]
 };
 
-class HazardLightsSelector : public autoware::agnocast_wrapper::Node
+class HazardLightsSelector : public rclcpp::Node
 {
 public:
   explicit HazardLightsSelector(const rclcpp::NodeOptions & node_options);
@@ -39,30 +38,30 @@ private:
   Parameters params_;
 
   // Subscriber
-  AUTOWARE_SUBSCRIPTION_PTR(autoware_vehicle_msgs::msg::HazardLightsCommand)
-  sub_hazard_lights_command_from_planning_;
-  AUTOWARE_SUBSCRIPTION_PTR(autoware_vehicle_msgs::msg::HazardLightsCommand)
-  sub_hazard_lights_command_from_system_;
+  rclcpp::Subscription<autoware_vehicle_msgs::msg::HazardLightsCommand>::SharedPtr
+    sub_hazard_lights_command_from_planning_;
+  rclcpp::Subscription<autoware_vehicle_msgs::msg::HazardLightsCommand>::SharedPtr
+    sub_hazard_lights_command_from_system_;
 
   void on_hazard_lights_command_from_planning(
-    const AUTOWARE_MESSAGE_CONST_SHARED_PTR(autoware_vehicle_msgs::msg::HazardLightsCommand) & msg);
+    const autoware_vehicle_msgs::msg::HazardLightsCommand::SharedPtr msg);
   void on_hazard_lights_command_from_system(
-    const AUTOWARE_MESSAGE_CONST_SHARED_PTR(autoware_vehicle_msgs::msg::HazardLightsCommand) & msg);
+    const autoware_vehicle_msgs::msg::HazardLightsCommand::SharedPtr msg);
 
   // Publisher
-  AUTOWARE_PUBLISHER_PTR(autoware_vehicle_msgs::msg::HazardLightsCommand)
-  pub_hazard_lights_command_;
+  rclcpp::Publisher<autoware_vehicle_msgs::msg::HazardLightsCommand>::SharedPtr
+    pub_hazard_lights_command_;
 
   // Timer
-  AUTOWARE_TIMER_PTR timer_;
+  rclcpp::TimerBase::SharedPtr timer_;
 
   void on_timer();
 
   // State
-  AUTOWARE_MESSAGE_CONST_SHARED_PTR(autoware_vehicle_msgs::msg::HazardLightsCommand)
-  hazard_lights_command_from_planning_;
-  AUTOWARE_MESSAGE_CONST_SHARED_PTR(autoware_vehicle_msgs::msg::HazardLightsCommand)
-  hazard_lights_command_from_system_;
+  autoware_vehicle_msgs::msg::HazardLightsCommand::ConstSharedPtr
+    hazard_lights_command_from_planning_;
+  autoware_vehicle_msgs::msg::HazardLightsCommand::ConstSharedPtr
+    hazard_lights_command_from_system_;
 };
 }  // namespace autoware::hazard_lights_selector
 
