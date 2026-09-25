@@ -65,21 +65,21 @@ if(CUDA_AVAIL AND TRT_AVAIL)
   find_package(MPPI-Generic REQUIRED)
   find_package(ament_index_cpp REQUIRED)
   pluginlib_export_plugin_description_file(
-    autoware_trajectory_processor trajectory_processor_plugins.xml)
+    autoware_trajectory_modifier trajectory_modifier_plugins.xml)
   add_library(mppi_extensions INTERFACE)
   add_library(MppiExtensions::extensions ALIAS mppi_extensions)
   target_include_directories(mppi_extensions BEFORE INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
   target_link_libraries(mppi_extensions INTERFACE MPPI::MPPI)
 
-  # acados reaches this package transitively, through autoware_trajectory_processor.
+  # acados reaches this package transitively, through autoware_trajectory_modifier.
   # libacados.so lists libqpOASES_e.so / libhpipm.so / libblasfeo.so.0 as DT_NEEDED
-  # but carries no usable search path for them, and we link the trajectory_processor
+  # but carries no usable search path for them, and we link the trajectory_modifier
   # libraries directly instead of through ament_target_dependencies -- so the
-  # "-L<acados>/lib" that autoware_trajectory_processor publishes via
+  # "-L<acados>/lib" that autoware_trajectory_modifier publishes via
   # ament_export_link_flags never reaches our link line. ld then cannot locate those
   # transitive DSOs and every acados symbol comes back undefined.
-  # Same workaround as autoware_trajectory_processor/CMakeLists.txt: resolve the
+  # Same workaround as autoware_trajectory_modifier/CMakeLists.txt: resolve the
   # acados lib dir, link its runtime libs directly so they land as DT_NEEDED on our
   # own binaries (surviving pluginlib dlopen without LD_LIBRARY_PATH), and record
   # the directory in the build/install RPATH.
@@ -217,19 +217,19 @@ if(CUDA_AVAIL AND TRT_AVAIL)
   cuda_add_library(first_order_dubins_mppi SHARED
     src/first_order_dubins/first_order_dubins_mppi_interface.cu
   )
-  find_package(autoware_trajectory_processor REQUIRED)
+  find_package(autoware_trajectory_modifier REQUIRED)
   ament_auto_add_library(mppi_temporal_mpt_nominal SHARED
     src/first_order_dubins/temporal_mpt_nominal.cpp
   )
   target_link_libraries(mppi_temporal_mpt_nominal
     mppi_trajectory_utils
-    ${autoware_trajectory_processor_LIBRARIES}
+    ${autoware_trajectory_modifier_LIBRARIES}
     rclcpp::rclcpp
     tf2::tf2
     tf2_geometry_msgs::tf2_geometry_msgs
     autoware_planning_msgs::autoware_planning_msgs__rosidl_generator_cpp
   )
-  # Entry point for acados here: ${autoware_trajectory_processor_LIBRARIES} above.
+  # Entry point for acados here: ${autoware_trajectory_modifier_LIBRARIES} above.
   mppi_link_acados_runtime(mppi_temporal_mpt_nominal)
   target_include_directories(first_order_dubins_mppi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -265,16 +265,16 @@ if(CUDA_AVAIL AND TRT_AVAIL)
   autoware_agnocast_wrapper_setup(${PROJECT_NAME})
   mppi_link_acados_runtime(${PROJECT_NAME})
 
-  ament_auto_add_library(autoware_mppi_trajectory_processor_plugin SHARED
+  ament_auto_add_library(autoware_mppi_trajectory_modifier_plugin SHARED
     src/trajectory_mppi_optimizer.cpp
   )
-  autoware_agnocast_wrapper_setup(autoware_mppi_trajectory_processor_plugin)
-  target_link_libraries(autoware_mppi_trajectory_processor_plugin
+  autoware_agnocast_wrapper_setup(autoware_mppi_trajectory_modifier_plugin)
+  target_link_libraries(autoware_mppi_trajectory_modifier_plugin
     first_order_dubins_mppi
     trajectory_mppi_optimizer_parameters
     ${PROJECT_NAME}
   )
-  mppi_link_acados_runtime(autoware_mppi_trajectory_processor_plugin)
+  mppi_link_acados_runtime(autoware_mppi_trajectory_modifier_plugin)
 
   add_executable(mppi_offline_retune
     src/tools/mppi_offline_retune.cpp
