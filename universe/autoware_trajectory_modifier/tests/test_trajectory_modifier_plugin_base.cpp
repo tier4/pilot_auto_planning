@@ -167,7 +167,6 @@ TEST(TrajectoryModifierParamsTest, PreservesDefaultCombinedPipelineOrder)
     "autoware::trajectory_modifier::plugin::SurroundObstacleStop",
     "autoware::trajectory_modifier::plugin::ObstacleStop",
     "autoware::trajectory_modifier::plugin::TrafficLightStop",
-    "autoware::trajectory_modifier::plugin::DetectionAreaStop",
     "autoware::trajectory_modifier::plugin::VelocityModifier",
     "autoware::trajectory_modifier::plugin::TrajectoryTemporalMPTOptimizer",
     "autoware::trajectory_modifier::plugin::TrajectoryPointFixer",
@@ -242,8 +241,7 @@ TEST_F(TrajectoryModifierPluginBaseTest, LoadsEveryPluginThroughCommonInterface)
     "autoware::trajectory_modifier::plugin::ObstacleStop",
     "autoware::trajectory_modifier::plugin::VelocityModifier",
     "autoware::trajectory_modifier::plugin::SurroundObstacleStop",
-    "autoware::trajectory_modifier::plugin::TrafficLightStop",
-    "autoware::trajectory_modifier::plugin::DetectionAreaStop"};
+    "autoware::trajectory_modifier::plugin::TrafficLightStop"};
 
   std::vector<std::shared_ptr<TrajectoryModifierPluginBase>> plugins;
   for (const auto & class_name : plugin_classes) {
