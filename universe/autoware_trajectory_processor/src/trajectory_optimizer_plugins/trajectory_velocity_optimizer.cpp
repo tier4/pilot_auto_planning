@@ -65,7 +65,8 @@ void TrajectoryVelocityOptimizer::on_initialize(const TrajectoryProcessorParams 
   cjs.min_jerk = params.limit.min_jerk;
 
   sub_planning_velocity_ =
-    make_polling_subscriber<VelocityLimit>("~/input/external_velocity_limit_mps", rclcpp::QoS{1});
+    make_polling_subscriber<VelocityLimit>(
+      "~/input/external_velocity_limit_mps", rclcpp::QoS{1}.transient_local());
 
   pub_velocity_limit_ = make_publisher<VelocityLimit>(
     "~/output/current_velocity_limit_mps", rclcpp::QoS{1}.transient_local());

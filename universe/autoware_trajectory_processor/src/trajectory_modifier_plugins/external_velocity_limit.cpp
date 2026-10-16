@@ -14,80 +14,132 @@
 
 #include "autoware/trajectory_processor/trajectory_modifier_plugins/external_velocity_limit.hpp"
 
-#include "autoware/trajectory_processor/trajectory_modifier_plugins/velocity_limits.hpp"
-
 #include <rclcpp/rclcpp.hpp>
 
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
 
 namespace autoware::trajectory_processor::plugin
 {
 
 namespace detail
 {
+// A zero constraint would make braking impossible, so it falls back to the default as well.
 double get_external_velocity_limit_deceleration(
   const autoware_internal_planning_msgs::msg::VelocityLimit & velocity_limit,
-  const double nominal_deceleration)
+  const double default_deceleration)
 {
-  return velocity_limit.use_constraints
-           ? std::abs(static_cast<double>(velocity_limit.constraints.min_acceleration))
-           : std::abs(nominal_deceleration);
+  const double deceleration = std::abs(velocity_limit.constraints.min_acceleration);
+  return velocity_limit.use_constraints && std::isfinite(deceleration) && deceleration > 0.0
+           ? deceleration
+           : std::abs(default_deceleration);
 }
 
 double get_external_velocity_limit_min_jerk(
   const autoware_internal_planning_msgs::msg::VelocityLimit & velocity_limit,
-  const double nominal_jerk)
+  const double default_jerk)
 {
-  return velocity_limit.use_constraints
-           ? std::abs(static_cast<double>(velocity_limit.constraints.min_jerk))
-           : std::abs(nominal_jerk);
+  const double jerk = std::abs(velocity_limit.constraints.min_jerk);
+  return velocity_limit.use_constraints && std::isfinite(jerk) && jerk > 0.0
+           ? jerk
+           : std::abs(default_jerk);
 }
 }  // namespace detail
+
+void ExternalVelocityLimit::publish_selected_debug_trajectory(
+  const TrajectoryPoints & points, const TrajectoryProcessorData & data) const
+{
+  if (data.candidate_index != 0U || !debug_trajectory_pub_ ||
+      debug_trajectory_pub_.get_subscription_count() == 0U) {
+    return;
+  }
+  autoware_planning_msgs::msg::Trajectory trajectory;
+  trajectory.header = data.candidate_header;
+  trajectory.points = points;
+  debug_trajectory_pub_(std::move(trajectory));
+}
 
 void ExternalVelocityLimit::on_initialize(const TrajectoryProcessorParams & params)
 {
   update_params(params);
-  velocity_limit_sub_ =
-    make_polling_subscriber<VelocityLimit>("~/input/external_velocity_limit_mps", rclcpp::QoS{1});
+  velocity_limit_sub_ = make_polling_subscriber<VelocityLimit>(
+    "~/input/external_velocity_limit_mps", rclcpp::QoS{1}.transient_local());
+  profile_reset_pub_ = make_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
+    "~/debug/velocity_profile_reset", rclcpp::QoS{10}.reliable().durability_volatile());
+  debug_trajectory_pub_ = make_publisher<autoware_planning_msgs::msg::Trajectory>(
+    "~/debug/external_velocity_limit/trajectory", rclcpp::QoS{1});
 }
 
 void ExternalVelocityLimit::update_params(const TrajectoryProcessorParams & params)
 {
   enabled_ = params.use_external_velocity_limit;
-  nominal_deceleration_ = params.stopping_constraints.nominal_deceleration;
-  nominal_jerk_ = params.stopping_constraints.jerk_limit;
+  constraints_ = detail::make_velocity_limit_constraints(params);
+  fixed_profile_.set_parameters(detail::make_fixed_profile_parameters(params));
+  if (!enabled_) {
+    fixed_profile_.clear();
+  }
 }
 
 ProcessingResult ExternalVelocityLimit::process(
   TrajectoryPoints & traj_points, TrajectoryProcessorData & input)
 {
+  last_profile_start_ = detail::ProfileStart::Measured;
   if (!enabled_ || traj_points.empty() || !input.current_odometry) {
+    publish_selected_debug_trajectory(traj_points, input);
     return ProcessingResult::Unchanged;
   }
 
+  auto stop_state = detail::make_fixed_profile_stop_state(traj_points);
   const auto velocity_limit = velocity_limit_sub_->take_data();
   if (
     !velocity_limit || !std::isfinite(velocity_limit->max_velocity) ||
     velocity_limit->max_velocity < 0.0F) {
+    fixed_profile_.clear();
+    publish_selected_debug_trajectory(traj_points, input);
     return ProcessingResult::Unchanged;
   }
 
-  const double deceleration =
-    detail::get_external_velocity_limit_deceleration(*velocity_limit, nominal_deceleration_);
+  auto constraints = constraints_;
+  constraints.max_deceleration = detail::get_external_velocity_limit_deceleration(
+    *velocity_limit, constraints_.max_deceleration);
+  constraints.max_jerk =
+    detail::get_external_velocity_limit_min_jerk(*velocity_limit, constraints_.max_jerk);
   const double max_velocity = velocity_limit->max_velocity;
-  detail::VelocityLimitOptions options;
-  options.current_ego_velocity = input.current_odometry->twist.twist.linear.x;
-  options.current_ego_acceleration = input.current_acceleration->accel.accel.linear.x;
-  const double min_jerk =
-    detail::get_external_velocity_limit_min_jerk(*velocity_limit, nominal_jerk_);
+  stop_state.zero_speed_limit = max_velocity <= detail::k_fixed_profile_stop_velocity_threshold_mps;
+  const auto start = fixed_profile_.start(input, stop_state, traj_points);
+  last_profile_start_ = start.start;
+  if (detail::is_reset(start.start)) {
+    RCLCPP_DEBUG(
+      get_logger(), "%s: candidate %zu restarted from the measured ego state (%s)",
+      get_short_name().c_str(), input.candidate_index, detail::to_string(start.start));
+    autoware_internal_debug_msgs::msg::StringStamped reset;
+    reset.stamp = now();
+    reset.data = "plugin=" + get_name() + " candidate=" + std::to_string(input.candidate_index) +
+                 " reason=" + detail::to_string(start.start);
+    profile_reset_pub_(reset);
+  }
   const auto result = detail::apply_velocity_limits(
-    traj_points, deceleration, min_jerk,
+    traj_points, constraints,
     [max_velocity](const geometry_msgs::msg::Point &) {
       return std::optional<double>{max_velocity};
     },
-    options);
+    start.options);
+  if (!result.error.empty()) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 1000, "%s: candidate %zu: %s", get_short_name().c_str(),
+      input.candidate_index, result.error.c_str());
+  }
+  // An unchanged result with a diagnostic rejected the proposed profile. Forget the previous
+  // plan so the next cycle starts from the measured state instead of reusing an invalid one.
+  if (result.status == ProcessingResult::Unchanged && !result.error.empty()) {
+    fixed_profile_.store(input, TrajectoryPoints{}, stop_state);
+  } else {
+    fixed_profile_.store(input, traj_points, stop_state);
+  }
+  publish_selected_debug_trajectory(traj_points, input);
   return result.status;
 }
 

@@ -55,7 +55,8 @@ private:
   void publishVelocityLimit(const VelocityLimit & velocity_limit);
   void setVelocityLimitFromAPI(const VelocityLimit & velocity_limit);
   void setVelocityLimitFromInternal(const VelocityLimit & velocity_limit);
-  void clearVelocityLimit(const std::string & sender);
+  // Returns false when the sender is not in the table (no-op; caller must not republish).
+  bool clearVelocityLimit(const std::string & sender);
   void updateVelocityLimit();
   void publishDebugString();
   VelocityLimit getCurrentVelocityLimit() { return hardest_limit_; }

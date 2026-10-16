@@ -131,15 +131,20 @@ ExternalVelocityLimitSelectorNode::ExternalVelocityLimitSelectorNode(
     "input/velocity_limit_clear_command_from_internal", rclcpp::QoS{10}.transient_local(),
     std::bind(&ExternalVelocityLimitSelectorNode::onVelocityLimitClearCommand, this, _1));
 
-  // Output
-  pub_external_velocity_limit_ =
-    this->create_publisher<VelocityLimit>("output/external_velocity_limit", 1);
+  // Output (transient_local so late subscribers still receive the last published limit)
+  pub_external_velocity_limit_ = this->create_publisher<VelocityLimit>(
+    "output/external_velocity_limit", rclcpp::QoS{1}.transient_local());
 
   pub_debug_string_ = this->create_publisher<StringStamped>("output/debug", 1);
 
   // Params
   param_listener_ = std::make_shared<::external_velocity_limit_selector::ParamListener>(
     this->get_node_parameters_interface());
+
+  // Publish the default max_vel immediately so late subscribers (transient_local) do not keep a
+  // zero-initialized VelocityLimit from spurious clear commands before any limit is set.
+  updateVelocityLimit();
+  publishVelocityLimit(getCurrentVelocityLimit());
 }
 
 void ExternalVelocityLimitSelectorNode::onVelocityLimitFromAPI(
@@ -173,7 +178,11 @@ void ExternalVelocityLimitSelectorNode::onVelocityLimitClearCommand(
     return;
   }
 
-  clearVelocityLimit(msg->sender);
+  // Do not republish when the sender was not registered: otherwise hardest_limit_ stays at the
+  // default-constructed max_velocity=0 and ExternalVelocityLimit clamps the trajectory to stop.
+  if (!clearVelocityLimit(msg->sender)) {
+    return;
+  }
 
   const auto velocity_limit = getCurrentVelocityLimit();
   publishVelocityLimit(velocity_limit);
@@ -224,16 +233,18 @@ void ExternalVelocityLimitSelectorNode::setVelocityLimitFromInternal(
   updateVelocityLimit();
 }
 
-void ExternalVelocityLimitSelectorNode::clearVelocityLimit(const std::string & sender)
+bool ExternalVelocityLimitSelectorNode::clearVelocityLimit(const std::string & sender)
 {
-  if (velocity_limit_table_.empty()) {
-    RCLCPP_WARN(get_logger(), "no velocity limit has been set from internal.");
-    return;
+  if (velocity_limit_table_.count(sender) == 0) {
+    RCLCPP_DEBUG(
+      get_logger(), "no velocity limit has been set from internal. sender:%s", sender.c_str());
+    return false;
   }
 
   velocity_limit_table_.erase(sender);
 
   updateVelocityLimit();
+  return true;
 }
 
 void ExternalVelocityLimitSelectorNode::updateVelocityLimit()
