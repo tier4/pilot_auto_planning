@@ -274,9 +274,6 @@ void MLPlanner::set_up_params()
   stop_fixing.min_deceleration_duration_sec =
     this->declare_parameter<double>("stop_point_fixing.min_deceleration_duration_sec", 1.0);
 
-  params_.turn_indicator_hold_duration_sec =
-    this->declare_parameter<double>("turn_indicator_hold_duration_sec", 0.0);
-
   // planning factor params
   planning_factor_params_.enable_stop =
     this->declare_parameter<bool>("planning_factor.enable_stop", false);
@@ -443,9 +440,6 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
     parameters, "stop_point_fixing.min_deceleration_duration_sec",
     stop_fixing.min_deceleration_duration_sec);
 
-  update_param<double>(
-    parameters, "turn_indicator_hold_duration_sec", new_params.turn_indicator_hold_duration_sec);
-
   update_param<bool>(
     parameters, "planning_factor.enable_stop", new_planning_factor_params.enable_stop);
   update_param<bool>(
@@ -575,9 +569,6 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
   if (stop_fixing.velocity_threshold_mps < 0.0 || stop_fixing.min_deceleration_duration_sec < 0.0) {
     return failure("stop point fixing thresholds must be non-negative");
   }
-  if (new_params.turn_indicator_hold_duration_sec < 0.0) {
-    return failure("turn_indicator_hold_duration_sec must be non-negative");
-  }
 
   const bool reload_model = new_params.base_model_directory != params_.base_model_directory ||
                             new_params.onnx_model_filename != params_.onnx_model_filename ||
@@ -650,11 +641,10 @@ void MLPlanner::publish_debug_markers(
 {
   if (debug_params_.publish_debug_route) {
     auto lifetime = rclcpp::Duration::from_seconds(0.2);
-    // All waypoints of one batch entry as one polyline
-    auto route_markers = utils::create_map_polyline_marker(
-      ego_to_map_transform, input_data_map.at("route_waypoints"),
-      {1, 1, NUM_ROUTE_WAYPOINTS, ROUTE_WAYPOINTS_SHAPE[2]}, timestamp, lifetime,
-      {0.8f, 0.8f, 0.8f, 0.8f}, "route_waypoints", "map");
+    auto route_markers = utils::create_lane_marker(
+      ego_to_map_transform, input_data_map.at("route_lanes"),
+      std::vector<int64_t>(ROUTE_LANES_SHAPE.begin(), ROUTE_LANES_SHAPE.end()), timestamp, lifetime,
+      {0.8, 0.8, 0.8, 0.8}, "map");
     pub_route_marker_->publish(route_markers);
   }
 
@@ -789,7 +779,7 @@ void MLPlanner::on_timer()
   diagnostics_inference_->add_key_value(
     "valid_lane_count", core_->count_valid_elements(input_data_map, "lanes"));
   diagnostics_inference_->add_key_value(
-    "valid_route_count", core_->count_valid_elements(input_data_map, "route_waypoints"));
+    "valid_route_count", core_->count_valid_elements(input_data_map, "route_lanes"));
   diagnostics_inference_->add_key_value(
     "valid_intersection_area_count",
     core_->count_valid_elements(input_data_map, "intersection_area"));
