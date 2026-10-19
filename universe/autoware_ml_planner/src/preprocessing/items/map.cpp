@@ -216,6 +216,66 @@ std::vector<std::vector<LanePoint>> resample_line_string(
   return result;
 }
 
+/**
+ * @brief Split a polyline into n_parts pieces of equal arc length, each resampled to num_points.
+ *
+ * Pieces share their end points. Splitting by arc-length ratio keeps the pieces of a centerline
+ * and its two bounds aligned even though the three lines differ in length.
+ */
+std::vector<Polyline> split_polyline(
+  const Polyline & input, const size_t n_parts, const size_t num_points)
+{
+  if (n_parts <= 1 || input.size() < 2) {
+    return {interpolate_points(input, num_points)};
+  }
+  std::vector<double> arc_lengths(input.size(), 0.0);
+  for (size_t i = 1; i < input.size(); ++i) {
+    arc_lengths[i] = arc_lengths[i - 1] + (input[i] - input[i - 1]).norm();
+  }
+  const double total_length = arc_lengths.back();
+
+  auto point_at = [&](const double s) {
+    const auto upper = std::lower_bound(arc_lengths.begin(), arc_lengths.end(), s);
+    if (upper == arc_lengths.begin()) {
+      return input.front();
+    }
+    if (upper == arc_lengths.end()) {
+      return input.back();
+    }
+    const size_t i = static_cast<size_t>(upper - arc_lengths.begin());
+    const double length = arc_lengths[i] - arc_lengths[i - 1];
+    const double t = length > 1e-6 ? (s - arc_lengths[i - 1]) / length : 0.0;
+    return LanePoint(input[i - 1] + t * (input[i] - input[i - 1]));
+  };
+
+  std::vector<Polyline> result;
+  result.reserve(n_parts);
+  for (size_t part = 0; part < n_parts; ++part) {
+    const double s_start = total_length * static_cast<double>(part) / static_cast<double>(n_parts);
+    const double s_end =
+      total_length * static_cast<double>(part + 1) / static_cast<double>(n_parts);
+    Polyline piece;
+    piece.push_back(part == 0 ? input.front() : point_at(s_start));
+    for (size_t i = 0; i < input.size(); ++i) {
+      if (arc_lengths[i] > s_start && arc_lengths[i] < s_end) {
+        piece.push_back(input[i]);
+      }
+    }
+    piece.push_back(part + 1 == n_parts ? input.back() : point_at(s_end));
+    result.push_back(interpolate_points(piece, num_points));
+  }
+  return result;
+}
+
+double polyline_length(const Polyline & polyline)
+{
+  double length = 0.0;
+  for (size_t i = 1; i < polyline.size(); ++i) {
+    length += (polyline[i] - polyline[i - 1]).norm();
+  }
+  return length;
+}
+
 template <typename T>
 std::vector<LanePoint> convert_to_polyline(const T & line_string) noexcept
 {
@@ -246,18 +306,19 @@ LaneletMap convert_to_internal_lanelet_map(
     if (!lanelet_subtype || ACCEPTABLE_LANE_SUBTYPES.count(lanelet_subtype.value()) == 0) {
       continue;
     }
-    const Polyline centerline(
-      interpolate_points(convert_to_polyline(lanelet.centerline3d()), POINTS_PER_SEGMENT));
-    const Polyline left_boundary(
-      interpolate_points(convert_to_polyline(lanelet.leftBound3d()), POINTS_PER_SEGMENT));
-    const Polyline right_boundary(
-      interpolate_points(convert_to_polyline(lanelet.rightBound3d()), POINTS_PER_SEGMENT));
-
-    LanePoint mean_point(0.0, 0.0, 0.0);
-    for (const LanePoint & p : centerline) {
-      mean_point += p;
-    }
-    mean_point /= static_cast<double>(centerline.size());
+    const Polyline raw_centerline = convert_to_polyline(lanelet.centerline3d());
+    const double centerline_length = polyline_length(raw_centerline);
+    // Lanelets longer than LANE_SEGMENT_MAX_LENGTH_M are split into lane segments of equal length.
+    const size_t n_parts =
+      centerline_length > constants::LANE_SEGMENT_MAX_LENGTH_M
+        ? static_cast<size_t>(std::ceil(centerline_length / constants::LANE_SEGMENT_MAX_LENGTH_M))
+        : 1;
+    const std::vector<Polyline> centerlines =
+      split_polyline(raw_centerline, n_parts, POINTS_PER_SEGMENT);
+    const std::vector<Polyline> left_boundaries =
+      split_polyline(convert_to_polyline(lanelet.leftBound3d()), n_parts, POINTS_PER_SEGMENT);
+    const std::vector<Polyline> right_boundaries =
+      split_polyline(convert_to_polyline(lanelet.rightBound3d()), n_parts, POINTS_PER_SEGMENT);
 
     const std::string left_line_type_str = lanelet.leftBound().attributeOr("type", "");
     const std::string right_line_type_str = lanelet.rightBound().attributeOr("type", "");
@@ -298,9 +359,18 @@ LaneletMap convert_to_internal_lanelet_map(
       (traffic_light_list.empty() ? LaneSegment::TRAFFIC_LIGHT_ID_NONE
                                   : traffic_light_list.front()->id());
 
-    lanelet_map.lane_segments.emplace_back(
-      lanelet.id(), centerline, left_boundary, right_boundary, mean_point, left_line_type,
-      right_line_type, speed_limit_mps, turn_direction, traffic_light_id);
+    for (size_t part = 0; part < centerlines.size(); ++part) {
+      const Polyline & centerline = centerlines[part];
+      LanePoint mean_point(0.0, 0.0, 0.0);
+      for (const LanePoint & p : centerline) {
+        mean_point += p;
+      }
+      mean_point /= static_cast<double>(centerline.size());
+
+      lanelet_map.lane_segments.emplace_back(
+        lanelet.id(), centerline, left_boundaries.at(part), right_boundaries.at(part), mean_point,
+        left_line_type, right_line_type, speed_limit_mps, turn_direction, traffic_light_id);
+    }
   }
 
   // parse polygon layers
@@ -343,7 +413,7 @@ namespace
 {
 using autoware_perception_msgs::msg::TrafficLightElement;
 
-std::map<lanelet::Id, size_t> create_lane_id_to_array_index_map(
+std::map<lanelet::Id, std::vector<size_t>> create_lane_id_to_array_index_map(
   const std::vector<LaneSegment> & lane_segments);
 bool is_segment_inside(const LaneSegment & segment, const Eigen::Matrix4d & transform_matrix);
 bool is_on_ego_level(const Polyline & points_in_ego_frame);
@@ -400,10 +470,14 @@ std::vector<int64_t> LaneSegmentContext::select_route_segment_indices(
   for (const auto & route_segment : route.segments) {
     // add index
     const int64_t lanelet_id = route_segment.preferred_primitive.id;
-    if (lanelet_id_to_array_index_.count(lanelet_id) == 0) {
+    const auto itr = lanelet_id_to_array_index_.find(lanelet_id);
+    if (itr == lanelet_id_to_array_index_.end()) {
       continue;
     }
-    array_indices.push_back(static_cast<int64_t>(lanelet_id_to_array_index_.at(lanelet_id)));
+    // A split lanelet contributes all of its segments in driving order.
+    for (const size_t array_index : itr->second) {
+      array_indices.push_back(static_cast<int64_t>(array_index));
+    }
   }
 
   // calculate closest index
@@ -626,15 +700,20 @@ LaneSegmentContext::create_tensor_data_from_indices(
 
     // Process each point in the segment
     for (int64_t i = 0; i < POINTS_PER_SEGMENT; ++i) {
-      // Left (0, 1)
-      const Eigen::Vector4d left = transform_matrix * convert_to_vector4d(left_boundary[i]);
-      tensor_data(added_segments, i, LB_X) = static_cast<float>(left.x());
-      tensor_data(added_segments, i, LB_Y) = static_cast<float>(left.y());
+      // Center (0, 1)
+      const Eigen::Vector4d center = transform_matrix * convert_to_vector4d(centerline[i]);
+      tensor_data(added_segments, i, X) = static_cast<float>(center.x());
+      tensor_data(added_segments, i, Y) = static_cast<float>(center.y());
 
-      // Right (2, 3)
+      // Left (2, 3)
+      const Eigen::Vector4d left = transform_matrix * convert_to_vector4d(left_boundary[i]);
+      tensor_data(added_segments, i, LB_X) = static_cast<float>(left.x() - center.x());
+      tensor_data(added_segments, i, LB_Y) = static_cast<float>(left.y() - center.y());
+
+      // Right (4, 5)
       const Eigen::Vector4d right = transform_matrix * convert_to_vector4d(right_boundary[i]);
-      tensor_data(added_segments, i, RB_X) = static_cast<float>(right.x());
-      tensor_data(added_segments, i, RB_Y) = static_cast<float>(right.y());
+      tensor_data(added_segments, i, RB_X) = static_cast<float>(right.x() - center.x());
+      tensor_data(added_segments, i, RB_Y) = static_cast<float>(right.y() - center.y());
     }
 
     speed_limit_tensor(added_segments, 0) = lane_segment.speed_limit_mps.value_or(0.0f);
@@ -642,86 +721,6 @@ LaneSegmentContext::create_tensor_data_from_indices(
   }
 
   return {std::move(tensor_data), std::move(lane_type_tensor), std::move(speed_limit_tensor)};
-}
-
-xt::xarray<float> LaneSegmentContext::create_route_waypoint_tensor(
-  const Eigen::Matrix4d & transform_matrix, const std::vector<int64_t> & segment_indices,
-  const int64_t num_waypoints, const double spacing_m) const
-{
-  std::vector<Eigen::Vector2d> line;
-  line.reserve(segment_indices.size() * static_cast<size_t>(POINTS_PER_SEGMENT));
-  for (const int64_t segment_idx : segment_indices) {
-    const LaneSegment & lane_segment = lanelet_map_.lane_segments[segment_idx];
-    if (
-      lane_segment.centerline.size() != POINTS_PER_SEGMENT ||
-      lane_segment.left_boundary.size() != POINTS_PER_SEGMENT ||
-      lane_segment.right_boundary.size() != POINTS_PER_SEGMENT) {
-      continue;
-    }
-    for (const LanePoint & point : lane_segment.centerline) {
-      const Eigen::Vector4d transformed =
-        transform_matrix * Eigen::Vector4d(point.x(), point.y(), point.z(), 1.0);
-      line.emplace_back(transformed.x(), transformed.y());
-    }
-  }
-  return sample_route_waypoints(line, num_waypoints, spacing_m);
-}
-
-xt::xarray<float> sample_route_waypoints(
-  const std::vector<Eigen::Vector2d> & line, const int64_t num_waypoints, const double spacing_m)
-{
-  constexpr int64_t cos_index = 2;
-  constexpr int64_t sin_index = 3;
-  constexpr double epsilon = 1e-9;
-
-  xt::xarray<float> waypoints =
-    xt::zeros<float>({static_cast<size_t>(num_waypoints), static_cast<size_t>(POSE_DIM)});
-  if (line.size() < 2) {
-    return waypoints;
-  }
-
-  // Distance along the line to each point
-  const size_t num_parts = line.size() - 1;
-  std::vector<double> arc(line.size(), 0.0);
-  for (size_t i = 0; i < num_parts; ++i) {
-    arc[i + 1] = arc[i] + (line[i + 1] - line[i]).norm();
-  }
-
-  // The ego stands where the origin projects onto the nearest line part (the first one on a tie)
-  double nearest_distance = std::numeric_limits<double>::infinity();
-  double ego_arc = 0.0;
-  for (size_t i = 0; i < num_parts; ++i) {
-    const Eigen::Vector2d step = line[i + 1] - line[i];
-    const double t =
-      std::clamp(-line[i].dot(step) / std::max(step.squaredNorm(), epsilon), 0.0, 1.0);
-    const double distance = (line[i] + t * step).norm();
-    if (distance < nearest_distance) {
-      nearest_distance = distance;
-      ego_arc = arc[i] + t * (arc[i + 1] - arc[i]);
-    }
-  }
-
-  size_t part = 0;
-  for (int64_t k = 0; k < num_waypoints; ++k) {
-    const double target = ego_arc + static_cast<double>(k) * spacing_m;
-    if (target >= arc.back()) {
-      break;  // The route ends before this waypoint: it and the ones after it stay zero
-    }
-    // The last line part that starts at or before the target
-    while (part + 1 < num_parts && arc[part + 1] <= target) {
-      ++part;
-    }
-    const Eigen::Vector2d step = line[part + 1] - line[part];
-    const double fraction =
-      std::clamp((target - arc[part]) / std::max(arc[part + 1] - arc[part], epsilon), 0.0, 1.0);
-    const Eigen::Vector2d position = line[part] + fraction * step;
-    const Eigen::Vector2d direction = step / std::max(step.norm(), epsilon);
-    waypoints(k, X) = static_cast<float>(position.x());
-    waypoints(k, Y) = static_cast<float>(position.y());
-    waypoints(k, cos_index) = static_cast<float>(direction.x());
-    waypoints(k, sin_index) = static_cast<float>(direction.y());
-  }
-  return waypoints;
 }
 
 namespace
@@ -784,12 +783,13 @@ xt::xarray<float> create_polyline_tensor(
 namespace
 {
 
-std::map<lanelet::Id, size_t> create_lane_id_to_array_index_map(
+std::map<lanelet::Id, std::vector<size_t>> create_lane_id_to_array_index_map(
   const std::vector<LaneSegment> & lane_segments)
 {
-  std::map<lanelet::Id, size_t> lane_id_to_index;
+  // Segments of a split lanelet are stored consecutively in driving order.
+  std::map<lanelet::Id, std::vector<size_t>> lane_id_to_index;
   for (size_t i = 0; i < lane_segments.size(); ++i) {
-    lane_id_to_index[lane_segments[i].id] = i;
+    lane_id_to_index[lane_segments[i].id].push_back(i);
   }
   return lane_id_to_index;
 }
