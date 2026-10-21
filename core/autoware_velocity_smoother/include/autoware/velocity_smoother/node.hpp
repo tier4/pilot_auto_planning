@@ -103,7 +103,7 @@ private:
     VelocityLimit, autoware_utils_rclcpp::polling_policy::Newest>::SharedPtr
     sub_external_velocity_limit_ = autoware::agnocast_wrapper::polling::create_polling_subscriber<
       VelocityLimit, autoware_utils_rclcpp::polling_policy::Newest>(
-      this, "~/input/external_velocity_limit_mps");
+      this, "~/input/external_velocity_limit_mps", rclcpp::QoS{1}.transient_local());
   autoware::agnocast_wrapper::polling::PollingSubscriber<OperationModeState>::SharedPtr
     sub_operation_mode_ =
       autoware::agnocast_wrapper::polling::create_polling_subscriber<OperationModeState>(
