@@ -396,7 +396,7 @@ std::tuple<size_t, size_t, double> resolve_interpolation(
   }
 
   const double denom = values.at(upper_idx) - values.at(lower_idx);
-  ratio = denom > 1e-6 ? (target_value - values.at(lower_idx)) / denom : 0.0;
+  ratio = denom > 1e-6 ? std::clamp((target_value - values.at(lower_idx)) / denom, 0.0, 1.0) : 0.0;
 
   return {lower_idx, upper_idx, ratio};
 }
