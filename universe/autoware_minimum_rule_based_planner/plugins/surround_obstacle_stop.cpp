@@ -120,8 +120,8 @@ void SurroundObstacleStop::on_initialize(const MinimumRuleBasedPlannerParams & p
   params_ = params.surround_obstacle_stop;
 
   planning_factor_interface_ =
-    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterface>(
-      get_node_ptr(), "backup_planner_surround_obstacle_stop");
+    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterfaceT<
+      autoware::agnocast_wrapper::Node>>(get_node_ptr(), "backup_planner_surround_obstacle_stop");
 
   pub_debug_text_ =
     get_node_ptr()->create_publisher<StringStamped>("~/surround_obstacle_stop/debug/text", 1);
@@ -209,8 +209,10 @@ obstacle_proximity_checker::Inputs SurroundObstacleStop::to_proximity_checker_in
     ego_side_offset + params_.side_distance_th.pointcloud + params_.hysteresis_distance;
   const auto [min_x, max_x] = std::pair(-rear_offset, front_offset);
   const auto [min_y, max_y] = std::pair(-side_offset, side_offset);
+  const auto min_z = params_.pcd_min_height;
+  const auto max_z = context_->vehicle_info.vehicle_height_m + params_.pcd_height_buffer;
   pointcloud_filter_->filter_pointcloud(
-    transformed_pointcloud, min_x, max_x, min_y, max_y, -10.0, 10.0);
+    transformed_pointcloud, min_x, max_x, min_y, max_y, min_z, max_z);
 
   // ProximityChecker expects PointXYZ; drop CPE fields after label/range filtering.
   auto xyz_pointcloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
