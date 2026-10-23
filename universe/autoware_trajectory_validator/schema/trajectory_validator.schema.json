@@ -184,8 +184,14 @@
     "object_drac_acceleration": {
       "type": "object",
       "properties": {
-        "safe_limit": { "$ref": "#/definitions/labeled_double" },
-        "low_caution_limit": { "$ref": "#/definitions/labeled_double" }
+        "safe_limit": {
+          "type": "number",
+          "description": "Required object deceleration at or milder than this is classified as safe [m/s²]."
+        },
+        "low_caution_limit": {
+          "type": "number",
+          "description": "Required object deceleration down to this is classified as low caution [m/s²]."
+        }
       },
       "required": [],
       "additionalProperties": false
@@ -214,18 +220,15 @@
       "type": "object",
       "properties": {
         "lateral": {
-          "type": "number",
-          "default": 0.0,
+          "$ref": "#/definitions/labeled_double",
           "description": "Lateral margin added to both sides of the ego footprint [m]."
         },
         "front": {
-          "type": "number",
-          "default": 0.0,
+          "$ref": "#/definitions/labeled_double",
           "description": "Front margin added to the ego footprint [m]."
         },
         "rear": {
-          "type": "number",
-          "default": 0.0,
+          "$ref": "#/definitions/labeled_double",
           "description": "Rear margin added to the ego footprint [m]."
         }
       },
@@ -295,22 +298,7 @@
                   "required": [],
                   "additionalProperties": false
                 },
-                "ego_footprint_margin": {
-                  "type": "object",
-                  "properties": {
-                    "lateral": { "$ref": "#/definitions/labeled_double" },
-                    "front": {
-                      "type": "number",
-                      "description": "Front margin added to the ego footprint for DRAC assessment [m]."
-                    },
-                    "rear": {
-                      "type": "number",
-                      "description": "Rear margin added to the ego footprint for DRAC assessment [m]."
-                    }
-                  },
-                  "required": [],
-                  "additionalProperties": false
-                },
+                "ego_footprint_margin": { "$ref": "#/definitions/ego_footprint_margin" },
                 "ego_reaction_braking_delay": {
                   "type": "object",
                   "properties": {

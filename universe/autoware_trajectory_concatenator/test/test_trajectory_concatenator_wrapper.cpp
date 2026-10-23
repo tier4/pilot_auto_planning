@@ -18,7 +18,6 @@
 
 #include "autoware/trajectory_concatenator/trajectory_concatenator_wrapper.hpp"
 
-#include <autoware/agnocast_wrapper/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <autoware_internal_planning_msgs/msg/candidate_trajectories.hpp>
@@ -71,8 +70,7 @@ class TrajectoryConcatenatorWrapperTest : public ::testing::Test
 protected:
   void SetUp() override
   {
-    node_ = std::make_shared<autoware::agnocast_wrapper::Node>(
-      "test_wrapper_node", rclcpp::NodeOptions{});
+    node_ = std::make_shared<rclcpp::Node>("test_wrapper_node", rclcpp::NodeOptions{});
     wrapper_ = std::make_unique<TrajectoryConcatenatorWrapper>(
       *node_, node_->get_node_parameters_interface());
   }
@@ -83,7 +81,7 @@ protected:
     node_.reset();
   }
 
-  std::shared_ptr<autoware::agnocast_wrapper::Node> node_;
+  std::shared_ptr<rclcpp::Node> node_;
   std::unique_ptr<TrajectoryConcatenatorWrapper> wrapper_;
 };
 

@@ -30,7 +30,7 @@ autoware_agnocast_wrapper_register_node(${PROJECT_NAME}
   PLUGIN "autoware::trajectory_selector::TrajectorySelectorNode"
   EXECUTABLE ${PROJECT_NAME}_node
   ROS2_EXECUTOR SingleThreadedExecutor
-  AGNOCAST_EXECUTOR AgnocastOnlyCallbackIsolatedExecutor
+  AGNOCAST_EXECUTOR CallbackIsolatedAgnocastExecutor
 )
 
 if(BUILD_TESTING)
@@ -52,22 +52,19 @@ if(BUILD_TESTING)
   # ==========================================
   # Node Integration Tests
   # ==========================================
-  # Tests that instantiate and spin a node are not built with ENABLE_AGNOCAST=1.
-  if(NOT (DEFINED ENV{ENABLE_AGNOCAST} AND "$ENV{ENABLE_AGNOCAST}" STREQUAL "1"))
-    ament_add_ros_isolated_gtest(test_trajectory_selector_node
-      test/node/test_trajectory_selector_node.cpp
-    )
+  ament_add_ros_isolated_gtest(test_trajectory_selector_node
+    test/node/test_trajectory_selector_node.cpp
+  )
 
-    target_link_libraries(test_trajectory_selector_node
-      ${PROJECT_NAME}
-      dummy_validator_plugin
-    )
+  target_link_libraries(test_trajectory_selector_node
+    ${PROJECT_NAME}
+    dummy_validator_plugin
+  )
 
-    ament_target_dependencies(test_trajectory_selector_node
-      autoware_test_utils
-      rosgraph_msgs
-    )
-  endif()
+  ament_target_dependencies(test_trajectory_selector_node
+    autoware_test_utils
+    rosgraph_msgs
+  )
 endif()
 
 autoware_ament_auto_package(

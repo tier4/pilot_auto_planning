@@ -22,7 +22,6 @@
 #include "autoware/trajectory_validator/pseudo_emergency_stop_handler.hpp"
 #include "autoware/trajectory_validator/validator_interface.hpp"
 
-#include <autoware/agnocast_wrapper/node.hpp>
 #include <autoware_utils_debug/debug_publisher.hpp>
 #include <autoware_utils_debug/time_keeper.hpp>
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>
@@ -79,7 +78,7 @@ public:
    * @param time_keeper Shared time keeper for processing time tracking.
    */
   TrajectoryValidatorWrapper(
-    autoware::agnocast_wrapper::Node & node,
+    rclcpp::Node & node,
     rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_interface,
     vehicle_info_utils::VehicleInfo vehicle_info,
     std::shared_ptr<autoware_utils_debug::TimeKeeper> time_keeper);
@@ -169,7 +168,7 @@ private:
   void publish_planning_factor(
     const autoware_internal_planning_msgs::msg::PlanningFactorArray & planning_factors);
 
-  autoware::agnocast_wrapper::Node * node_ptr_{nullptr};
+  rclcpp::Node * node_ptr_{nullptr};
   std::string interface_name_{"trajectory_validator"};
   rclcpp::Logger logger_;
   validator::ParamListener validator_params_listener_;
@@ -183,9 +182,8 @@ private:
   std::unordered_set<std::string> active_filter_names_;
 
   // Publishers
-  std::shared_ptr<autoware_utils_debug::BasicDebugPublisher<autoware::agnocast_wrapper::Node>> pub_debug_;
-  std::unique_ptr<
-    autoware::planning_factor_interface::PlanningFactorInterfaceT<autoware::agnocast_wrapper::Node>>
+  std::shared_ptr<autoware_utils_debug::DebugPublisher> pub_debug_;
+  std::unique_ptr<autoware::planning_factor_interface::PlanningFactorInterface>
     planning_factor_interface_;
   // Emergency-stop fallback (evaluation use only).
   std::unique_ptr<PseudoEmergencyStopHandler> pseudo_emergency_stop_handler_;

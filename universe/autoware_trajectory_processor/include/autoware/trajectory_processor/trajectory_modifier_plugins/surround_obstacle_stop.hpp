@@ -21,7 +21,6 @@
 
 #include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
 
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -57,7 +56,6 @@ protected:
 
 private:
   ModifierParams::SurroundObstacleStop params_;
-  ModifierParams::StoppingConstraints stopping_params_;
 
   std::unique_ptr<obstacle_proximity_checker::ProximityChecker> proximity_checker_;
   std::unique_ptr<utils::obstacle_stop::PointCloudFilter> pointcloud_filter_;
@@ -68,7 +66,7 @@ private:
   bool is_stop_active_{false};
   std::optional<rclcpp::Time> last_obstacle_found_time_;
 
-  PublisherHandle<StringStamped> pub_debug_text_;
+  rclcpp::Publisher<StringStamped>::SharedPtr pub_debug_text_;
 
   [[nodiscard]] bool check_inputs(const TrajectoryProcessorData & input) const;
 
