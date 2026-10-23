@@ -28,7 +28,6 @@
 #include <autoware_planning_msgs/msg/trajectory.hpp>
 #include <autoware_planning_msgs/msg/trajectory_point.hpp>
 
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -78,9 +77,9 @@ protected:
 private:
   std::shared_ptr<ContinuousJerkSmoother> continuous_jerk_smoother_{nullptr};
   TrajectoryVelocityOptimizerParams velocity_params_;
-  autoware::agnocast_wrapper::polling::PollingSubscriber<VelocityLimit>::SharedPtr
+  std::shared_ptr<autoware_utils_rclcpp::InterProcessPollingSubscriber<VelocityLimit>>
     sub_planning_velocity_;
-  PublisherHandle<VelocityLimit> pub_velocity_limit_;
+  rclcpp::Publisher<VelocityLimit>::SharedPtr pub_velocity_limit_;
 };
 }  // namespace autoware::trajectory_processor::plugin
 

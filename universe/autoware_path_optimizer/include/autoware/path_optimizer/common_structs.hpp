@@ -61,13 +61,11 @@ struct DebugData
 struct TrajectoryParam
 {
   TrajectoryParam() = default;
-  template <typename NodeT>
-  explicit TrajectoryParam(NodeT * node)
+  explicit TrajectoryParam(rclcpp::Node * node)
   {
     output_backward_traj_length =
-      node->template declare_parameter<double>("common.output_backward_traj_length");
-    output_delta_arc_length =
-      node->template declare_parameter<double>("common.output_delta_arc_length");
+      node->declare_parameter<double>("common.output_backward_traj_length");
+    output_delta_arc_length = node->declare_parameter<double>("common.output_delta_arc_length");
   }
 
   void onParam(const std::vector<rclcpp::Parameter> & parameters)
@@ -87,11 +85,10 @@ struct TrajectoryParam
 struct EgoNearestParam
 {
   EgoNearestParam() = default;
-  template <typename NodeT>
-  explicit EgoNearestParam(NodeT * node)
+  explicit EgoNearestParam(rclcpp::Node * node)
   {
-    dist_threshold = node->template declare_parameter<double>("ego_nearest_dist_threshold");
-    yaw_threshold = node->template declare_parameter<double>("ego_nearest_yaw_threshold");
+    dist_threshold = node->declare_parameter<double>("ego_nearest_dist_threshold");
+    yaw_threshold = node->declare_parameter<double>("ego_nearest_yaw_threshold");
   }
 
   void onParam(const std::vector<rclcpp::Parameter> & parameters)
