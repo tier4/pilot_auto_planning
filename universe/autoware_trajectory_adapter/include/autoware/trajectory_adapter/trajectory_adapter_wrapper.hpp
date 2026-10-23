@@ -17,8 +17,6 @@
 
 #include "autoware/trajectory_adapter/trajectory_adapter.hpp"
 
-#include <autoware/agnocast_wrapper/autoware_agnocast_wrapper.hpp>
-#include <autoware/agnocast_wrapper/node.hpp>
 #include <autoware_utils_debug/time_keeper.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -47,8 +45,7 @@ public:
    * @param time_keeper Shared time keeper for processing time tracking.
    */
   TrajectoryAdapterWrapper(
-    autoware::agnocast_wrapper::Node & node,
-    std::shared_ptr<autoware_utils_debug::TimeKeeper> time_keeper);
+    rclcpp::Node & node, std::shared_ptr<autoware_utils_debug::TimeKeeper> time_keeper);
 
   /**
    * @brief Selects the best trajectory from ranked candidates.
@@ -59,13 +56,14 @@ public:
     const ScoredCandidateTrajectories & scored_trajectories);
 
 private:
-  autoware::agnocast_wrapper::Node * node_ptr_{nullptr};
+  rclcpp::Node * node_ptr_{nullptr};
   std::string interface_name_{"trajectory_adapter"};
   rclcpp::Logger logger_;
   std::unique_ptr<TrajectoryAdapter> adapter_ptr_;
   mutable std::shared_ptr<autoware_utils_debug::TimeKeeper> time_keeper_{nullptr};
 
-  AUTOWARE_PUBLISHER_PTR(autoware_internal_debug_msgs::msg::Float64Stamped) debug_latency_pub_;
+  rclcpp::Publisher<autoware_internal_debug_msgs::msg::Float64Stamped>::SharedPtr
+    debug_latency_pub_;
 };
 
 }  // namespace autoware::trajectory_adapter
