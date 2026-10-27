@@ -105,8 +105,8 @@ private:
   nav_msgs::msg::Odometry::ConstSharedPtr cycle_odometry_;
   double cycle_acceleration_{0.0};
   bool cycle_initialized_{false};
-  rclcpp::Publisher<MarkerArray>::SharedPtr debug_viz_pub_;
-  rclcpp::Publisher<StringStamped>::SharedPtr pub_debug_text_;
+  PublisherHandle<MarkerArray> debug_viz_pub_;
+  PublisherHandle<StringStamped> pub_debug_text_;
 
   void prepare_cycle(const TrajectoryModifierData & input);
   bool modify_trajectory(TrajectoryPoints & traj_points, const TrajectoryModifierData & input);
