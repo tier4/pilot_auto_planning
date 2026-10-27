@@ -71,6 +71,29 @@ sources:
       - literal: This reverts commit 8756df69f1ee9241028d10b7f493ed030ee67b1b.
         replacement: This reverts commit 871a8540ade845c7c9a193029d407b411a4d685b.
 
+  # feat/v0.64/e2e is the integration line in the tier4 fork; the
+  # e2e_scenario_pass source above tracks the branch derived from it. Same
+  # retained paths and same message rewriting, so the two mirrors are
+  # comparable commit for commit.
+  tier4_universe_e2e_v064:
+    upstream: https://github.com/tier4/autoware_universe.git
+    ref: feat/v0.64/e2e
+    mirror_branch: feat/v0.64/e2e
+    paths:
+      - path: planning/
+      - path: .github/
+      - path: docs/
+      - regex: ^[^/]*$
+    message_rules:
+      - until: 2026-02-21T00:00:00Z
+        pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_universe#\1
+      - since: 2026-02-21T00:00:00Z
+        pattern: (?<!autowarefoundation)(?<!autowarefoundation/autoware_universe)#(\d+)
+        replacement: tier4/autoware_universe#\1
+      - literal: This reverts commit 8756df69f1ee9241028d10b7f493ed030ee67b1b.
+        replacement: This reverts commit 871a8540ade845c7c9a193029d407b411a4d685b.
+
   tier4_core_e2e:
     upstream: https://github.com/tier4/autoware_core.git
     ref: feat/v0.64/e2e_scenario_pass
