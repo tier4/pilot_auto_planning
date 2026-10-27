@@ -420,7 +420,7 @@ ProcessingResult TrajectoryMppiOptimizer::process(
     bool mpc_prediction_valid = false;
     if (latest_mpc_prediction) {
       const double age =
-        (get_node_ptr()->now() - rclcpp::Time{latest_mpc_prediction->header.stamp}).seconds();
+        (get_clock()->now() - rclcpp::Time{latest_mpc_prediction->header.stamp}).seconds();
       mpc_prediction_fresh =
         std::isfinite(age) && age >= -0.1 && age <= params_.mpc_predicted_trajectory_max_age_s;
       mpc_prediction_valid =

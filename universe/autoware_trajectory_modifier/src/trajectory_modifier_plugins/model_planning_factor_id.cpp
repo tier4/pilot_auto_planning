@@ -32,9 +32,7 @@ void ModelPlanningFactorID::apply_params(const TrajectoryModifierParams & params
 
 void ModelPlanningFactorID::on_initialize(const TrajectoryModifierParams & params)
 {
-  planning_factor_interface_ =
-    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterface>(
-      get_node_ptr(), "diffusion_planner");
+  init_planning_factor_interface("diffusion_planner");
   apply_params(params);
 }
 

@@ -104,13 +104,9 @@ std::vector<lanelet::Id> collect_route_lanelet_ids(
 
 void DetectionAreaStop::on_initialize(const TrajectoryModifierParams & params)
 {
-  const auto node_ptr = get_node_ptr();
-  planning_factor_interface_ =
-    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterface>(
-      node_ptr, "modifier_detection_area_stop");
-  debug_viz_pub_ = node_ptr->create_publisher<MarkerArray>("~/detection_area_stop/debug/marker", 1);
-  pub_debug_text_ =
-    node_ptr->create_publisher<StringStamped>("~/detection_area_stop/debug/text", 1);
+  init_planning_factor_interface("modifier_detection_area_stop");
+  debug_viz_pub_ = make_publisher<MarkerArray>("~/detection_area_stop/debug/marker");
+  pub_debug_text_ = make_publisher<StringStamped>("~/detection_area_stop/debug/text");
   enabled_ = params.use_detection_area_stop;
   params_ = params.detection_area_stop;
   stopping_params_ = params.stopping_constraints;
@@ -211,7 +207,7 @@ std::shared_ptr<const DetectionAreaStop::PointCloud> DetectionAreaStop::make_map
     autoware_utils::transform_pointcloud(*pointcloud, *pointcloud, isometry);
   } catch (const tf2::TransformException & error) {
     RCLCPP_WARN_THROTTLE(
-      get_node_ptr()->get_logger(), *get_clock(), 1000,
+      get_logger(), *get_clock(), 1000,
       "[TM DetectionAreaStop] Cannot transform pointcloud to map: %s", error.what());
     return nullptr;
   }
@@ -224,13 +220,13 @@ void DetectionAreaStop::update_cycle_observations(const TrajectoryModifierData &
   if (params_.target_filtering.pointcloud && input.obstacle_pointcloud && !cycle_pointcloud_) {
     append_debug_status(debug_status_, "pointcloud unavailable");
     RCLCPP_WARN_THROTTLE(
-      get_node_ptr()->get_logger(), *get_clock(), 1000,
+      get_logger(), *get_clock(), 1000,
       "[TM DetectionAreaStop] Pointcloud detection is unavailable for this cycle");
   }
   if (!cycle_pointcloud_ && !input.predicted_objects) {
     append_debug_status(debug_status_, "fail-open: no pointcloud or predicted objects");
     RCLCPP_WARN_THROTTLE(
-      get_node_ptr()->get_logger(), *get_clock(), 1000,
+      get_logger(), *get_clock(), 1000,
       "[TM DetectionAreaStop] Neither pointcloud nor predicted objects are available");
   }
 
@@ -267,7 +263,7 @@ void DetectionAreaStop::update_cycle_observations(const TrajectoryModifierData &
       module.last_obstacle_found_time = now;
       if (params_.enable_detected_obstacle_logging) {
         RCLCPP_INFO_THROTTLE(
-          get_node_ptr()->get_logger(), *get_clock(), 1000,
+          get_logger(), *get_clock(), 1000,
           "[TM DetectionAreaStop] DetectionArea %ld detected obstacle from %s",
           module.regulatory_element->id(), module.detection_source.c_str());
       }
@@ -386,7 +382,7 @@ void DetectionAreaStop::rebuild_modules(const TrajectoryModifierData & input)
       lane = input.lanelet_map->laneletLayer.get(lane_id);
     } catch (const std::exception & error) {
       RCLCPP_WARN_THROTTLE(
-        get_node_ptr()->get_logger(), *get_clock(), 5000,
+        get_logger(), *get_clock(), 5000,
         "[TM DetectionAreaStop] Cannot find route lanelet %ld: %s", lane_id, error.what());
       continue;
     }
@@ -524,7 +520,7 @@ std::optional<DetectionAreaStop::StopDecision> DetectionAreaStop::evaluate_modul
       path, stop_line, -params_.dead_line_margin, context_->vehicle_info.max_longitudinal_offset_m);
     if (dead_line_s && *dead_line_s - *self_s < 0.0) {
       RCLCPP_WARN_THROTTLE(
-        get_node_ptr()->get_logger(), *get_clock(), 1000,
+        get_logger(), *get_clock(), 1000,
         "[TM DetectionAreaStop] DetectionArea %ld is over the dead line",
         module.regulatory_element->id());
       return std::nullopt;
@@ -563,7 +559,7 @@ std::optional<DetectionAreaStop::StopDecision> DetectionAreaStop::evaluate_modul
     if (params_.unstoppable_policy == "go") {
       decision.policy = "go";
       RCLCPP_WARN_THROTTLE(
-        get_node_ptr()->get_logger(), *get_clock(), 1000,
+        get_logger(), *get_clock(), 1000,
         "[TM DetectionAreaStop] Insufficient braking distance, policy: go");
       return std::nullopt;
     }
@@ -576,7 +572,7 @@ std::optional<DetectionAreaStop::StopDecision> DetectionAreaStop::evaluate_modul
         0.0);
       target_stop_s = stop_point_s + offset;
       RCLCPP_WARN_THROTTLE(
-        get_node_ptr()->get_logger(), *get_clock(), 1000,
+        get_logger(), *get_clock(), 1000,
         "[TM DetectionAreaStop] Insufficient braking distance, policy: stop_after_stopline");
     } else {
       decision.policy = "force_stop";
@@ -610,7 +606,7 @@ bool DetectionAreaStop::set_stop_point(
 
   if (utils::stop_point_exists(traj_points, decision.stop_point_arc_length)) {
     RCLCPP_WARN_THROTTLE(
-      get_node_ptr()->get_logger(), *get_clock(), 1000,
+      get_logger(), *get_clock(), 1000,
       "[TM DetectionAreaStop] Preceding (or duplicate) stop point exists, skip inserting stop "
       "point");
     return false;
@@ -644,7 +640,7 @@ bool DetectionAreaStop::set_stop_point(
   module.candidate_policy = decision.policy;
 
   RCLCPP_WARN_THROTTLE(
-    get_node_ptr()->get_logger(), *get_clock(), 1000,
+    get_logger(), *get_clock(), 1000,
     "[TM DetectionAreaStop] Inserted stop for DetectionArea %ld (%s) at arc length %f m",
     module.regulatory_element->id(), module.detection_source.c_str(),
     decision.stop_point_arc_length);
@@ -681,7 +677,7 @@ void DetectionAreaStop::publish_debug_string() const
   StringStamped debug_text;
   debug_text.stamp = get_clock()->now();
   debug_text.data = text.str();
-  pub_debug_text_->publish(debug_text);
+  pub_debug_text_(debug_text);
 }
 
 void DetectionAreaStop::publish_debug_data(const std::string & ns) const
@@ -811,7 +807,7 @@ void DetectionAreaStop::publish_debug_data(const std::string & ns) const
     }
   }
 
-  debug_viz_pub_->publish(marker_array);
+  debug_viz_pub_(marker_array);
 }
 
 void DetectionAreaStop::set_state(Module & module, const State state)
@@ -820,7 +816,7 @@ void DetectionAreaStop::set_state(Module & module, const State state)
   const auto old_state = module.state == State::GO ? "GO" : "STOP";
   const auto new_state = state == State::GO ? "GO" : "STOP";
   RCLCPP_INFO(
-    get_node_ptr()->get_logger(), "[TM DetectionAreaStop] DetectionArea %ld: %s -> %s",
+    get_logger(), "[TM DetectionAreaStop] DetectionArea %ld: %s -> %s",
     module.regulatory_element->id(), old_state, new_state);
   module.state = state;
 }
