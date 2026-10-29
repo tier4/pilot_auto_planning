@@ -192,14 +192,14 @@ void ObstacleStop::verify_params()
   auto & cruise = params_.cruise;
   if (cruise.ego_decel > rss.ego_decel) {
     RCLCPP_WARN(
-      get_node_ptr()->get_logger(),
+      get_logger(),
       "[TM ObstacleStop] cruise.ego_decel (%.2f) exceeds rss_params.ego_decel (%.2f), clamping",
       cruise.ego_decel, rss.ego_decel);
     cruise.ego_decel = rss.ego_decel;
   }
   if (cruise.min_distance < params_.stop_margin) {
     RCLCPP_WARN(
-      get_node_ptr()->get_logger(),
+      get_logger(),
       "[TM ObstacleStop] cruise.min_distance (%.2f) is below stop_margin (%.2f), clamping",
       cruise.min_distance, params_.stop_margin);
     cruise.min_distance = params_.stop_margin;
@@ -321,7 +321,7 @@ bool ObstacleStop::apply_cruise(
 
   if (!result.error.empty()) {
     RCLCPP_WARN_THROTTLE(
-      get_node_ptr()->get_logger(), *get_clock(), 1000,
+      get_logger(), *get_clock(), 1000,
       "[TM ObstacleStop] Cruise velocity limit failed for candidate %zu: %s", input.candidate_index,
       result.error.c_str());
   }
