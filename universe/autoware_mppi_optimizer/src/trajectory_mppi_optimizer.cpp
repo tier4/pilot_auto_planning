@@ -481,7 +481,7 @@ ProcessingResult TrajectoryMppiOptimizer::process(
     const auto objects_in_range = autoware::avoidance_target_detector::filter_objects_in_range(
       *data.tracked_objects, input, object_filter_margin_m_, object_filter_prediction_extension_s_);
     object_selector_.update_objects(
-      get_node_ptr()->now(), objects_in_range, input, *extended_route_handler_);
+      get_clock()->now(), objects_in_range, input, *extended_route_handler_);
     auto avoidance_targets = object_selector_.get_avoidance_targets(
       objects_in_range, input, extended_route_handler_->get_extended_route_bounds());
     const auto driving_along_targets =
@@ -521,7 +521,7 @@ ProcessingResult TrajectoryMppiOptimizer::process(
         input, avoidance_targets, mppi_road_borders, data.lanelet_map_bin->header.frame_id,
         *vehicle_params_, params_);
       input_collision_activation_source_ = input_collision_activation_hold_.update(
-        collision_triggered, get_node_ptr()->now().seconds(),
+        collision_triggered, get_clock()->now().seconds(),
         params_.min_input_collision_activation_duration_s);
       if (input_collision_activation_source_ == InputCollisionActivationSource::none) {
         constexpr auto level = diagnostic_msgs::msg::DiagnosticStatus::OK;
@@ -555,29 +555,6 @@ ProcessingResult TrajectoryMppiOptimizer::process(
       mpc_predicted_trajectory = *latest_mpc_prediction;
     }
 
-<<<<<<< HEAD
-    const auto objects_in_range = autoware::avoidance_target_detector::filter_objects_in_range(
-      *data.tracked_objects, input, object_filter_margin_m_, object_filter_prediction_extension_s_);
-    object_selector_.update_objects(
-      now(), objects_in_range, input, *extended_route_handler_);
-    auto avoidance_targets = object_selector_.get_avoidance_targets(
-      objects_in_range, input, extended_route_handler_->get_extended_route_bounds());
-    const auto driving_along_targets =
-      object_selector_.get_driving_along_vehicles(objects_in_range);
-
-    auto all_targets = avoidance_targets;
-    all_targets.objects.insert(
-      all_targets.objects.end(), driving_along_targets.objects.begin(),
-      driving_along_targets.objects.end());
-
-    const double boundary_query_margin = context_->vehicle_info.max_longitudinal_offset_m + 1.0;
-    const auto road_borders =
-      extended_route_handler_->get_road_borders_around_trajectory(input, boundary_query_margin);
-    const auto drivable_area =
-      extended_route_handler_->get_drivable_area_around_trajectory(input, boundary_query_margin);
-
-=======
->>>>>>> 488f8c87c (feat(mppi_optimizer): add option to use MPPI only if input has collision (tier4/autoware_universe#3630))
     const std::optional<geometry_msgs::msg::AccelWithCovarianceStamped> acceleration =
       data.current_acceleration ? std::make_optional(*data.current_acceleration) : std::nullopt;
     const std::optional<autoware_vehicle_msgs::msg::SteeringReport> steering =
