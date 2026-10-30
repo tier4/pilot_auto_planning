@@ -26,6 +26,8 @@ A minimum rule-based trajectory planner that generates safe and feasible traject
 | `~/input/odometry`               | `Odometry`                   | Ego pose and velocity             |
 | `~/input/acceleration`           | `AccelWithCovarianceStamped` | Ego acceleration                  |
 | `~/input/objects`                | `PredictedObjects`           | Surrounding obstacles             |
+| `~/input/external_velocity_limit_mps` | `VelocityLimit`         | External max speed (min with `velocity_smoother.max_speed_mps`) |
+| `~/input/velocity_limit_clear_command` | `VelocityLimitClearCommand` | Clears the external max speed of the same sender |
 | `~/input/test/path_with_lane_id` | `PathWithLaneId`             | Test mode: bypasses path planning |
 
 ### Outputs

@@ -29,6 +29,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -593,7 +594,10 @@ Trajectory MinimumRuleBasedPlannerNode::optimize_velocity(
     autoware_utils_debug::ScopedTimeTrack st_smoother("velocity_smoother", *time_keeper_);
     velocity_smoother_->optimize(
       trajectory_points, *input_data.odometry_ptr,
-      input_data.acceleration_ptr->accel.accel.linear.x, update_smoother_state);
+      input_data.acceleration_ptr->accel.accel.linear.x, update_smoother_state,
+      input_data.external_velocity_limit_ptr
+        ? std::make_optional<double>(input_data.external_velocity_limit_ptr->max_velocity)
+        : std::nullopt);
   }
 
   // Post-optimization resample
@@ -718,6 +722,11 @@ MinimumRuleBasedPlannerNode::InputData MinimumRuleBasedPlannerNode::take_data()
     obstacle_pointcloud_ptr_ = msg;
   }
   input_data.obstacle_pointcloud_ptr = obstacle_pointcloud_ptr_;
+
+  // subscribed by TrajectoryProcessorContext, which also handles the clear command
+  optimizer_context_->refresh_external_velocity_limit();
+  input_data.external_velocity_limit_ptr =
+    optimizer_context_->external_velocity_limit.active_limit();
 
   if (const auto msg = test_path_with_lane_id_subscriber_->take_data()) {
     test_path_with_lane_id_ptr = msg;

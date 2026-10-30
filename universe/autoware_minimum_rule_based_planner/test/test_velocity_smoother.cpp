@@ -14,12 +14,15 @@
 
 #include "velocity_smoother.hpp"
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace autoware::minimum_rule_based_planner
@@ -126,6 +129,149 @@ TEST(VelocitySmootherTest, LimitSpeedClampsVelocity)
   for (const auto & pt : traj) {
     EXPECT_LE(pt.longitudinal_velocity_mps, static_cast<float>(params.max_speed_mps) + 1e-3f);
   }
+}
+
+TEST(VelocitySmootherTest, LimitSpeedUsesMinOfParamAndExternalLimit)
+{
+  auto params = make_default_params();
+  params.limit_speed = true;
+  params.max_speed_mps = 5.0;
+
+  auto logger = rclcpp::get_logger("test_velocity_smoother");
+  auto clock = std::make_shared<rclcpp::Clock>(RCL_ROS_TIME);
+  autoware::vehicle_info_utils::VehicleInfo vehicle_info{};
+  vehicle_info.wheel_base_m = 2.79;
+
+  VelocitySmoother smoother(params, logger, clock, vehicle_info, nullptr);
+  auto odom = make_odometry(0.0, 0.0, 10.0);
+
+  // external limit below the param wins
+  auto traj = make_straight_trajectory(10, 1.0, 10.0f);
+  smoother.optimize(traj, odom, 0.0, true, 3.0);
+  for (const auto & pt : traj) {
+    EXPECT_LE(pt.longitudinal_velocity_mps, 3.0f + 1e-3f);
+  }
+
+  // external limit above the param does not raise the param limit
+  traj = make_straight_trajectory(10, 1.0, 10.0f);
+  smoother.optimize(traj, odom, 0.0, true, 8.0);
+  for (const auto & pt : traj) {
+    EXPECT_LE(pt.longitudinal_velocity_mps, 5.0f + 1e-3f);
+  }
+}
+
+TEST(VelocitySmootherTest, LoweredMaxSpeedAppliesAfterDecelDistance)
+{
+  rclcpp::init(0, nullptr);
+  rclcpp::NodeOptions options;
+  options.arguments(
+    {"--ros-args", "--params-file",
+     ament_index_cpp::get_package_share_directory("autoware_minimum_rule_based_planner") +
+       "/config/velocity_smoother/jerk_filtered_smoother.param.yaml"});
+  auto node = std::make_shared<rclcpp::Node>("test_velocity_smoother", options);
+  auto jerk_filtered_smoother = std::make_shared<autoware::velocity_smoother::JerkFilteredSmoother>(
+    *node, std::make_shared<autoware_utils_debug::TimeKeeper>());
+
+  auto params = make_default_params();
+  params.limit_speed = true;
+  autoware::vehicle_info_utils::VehicleInfo vehicle_info{};
+  vehicle_info.wheel_base_m = 2.79;
+  VelocitySmoother smoother(
+    params, node->get_logger(), node->get_clock(), vehicle_info, jerk_filtered_smoother);
+
+  constexpr float v0 = 11.11f;    // 40 km/h
+  constexpr double limit = 5.56;  // 20 km/h
+  const auto first_limited_x = [&](const TrajectoryPoints & traj) {
+    for (const auto & pt : traj) {
+      if (pt.longitudinal_velocity_mps < v0) return pt.pose.position.x;
+    }
+    return -1.0;
+  };
+
+  auto traj = make_straight_trajectory(200, 1.0, v0);
+  smoother.optimize(traj, make_odometry(0.0, 0.0, v0), 0.0, true, limit);
+  // at 1.0 m/s^2 (min_acc in the config) it takes at least this long to slow down
+  const double braking_dist = (v0 * v0 - limit * limit) / (2.0 * 1.0);
+  EXPECT_GT(first_limited_x(traj), braking_dist);
+  EXPECT_LE(traj.back().longitudinal_velocity_mps, limit + 1e-3);
+
+  // the braking distance is recomputed from the current speed
+  traj = make_straight_trajectory(200, 1.0, v0);
+  smoother.optimize(traj, make_odometry(10.0, 0.0, 8.0), -1.0, true, limit);
+  EXPECT_LT(first_limited_x(traj) - 10.0, braking_dist);
+  EXPECT_LE(traj.back().longitudinal_velocity_mps, limit + 1e-3);
+
+  // once the ego meets the limit, it applies everywhere even if the ego speed rises again
+  smoother.optimize(traj, make_odometry(40.0, 0.0, limit), 0.0, true, limit);
+  traj = make_straight_trajectory(200, 1.0, v0);
+  smoother.optimize(traj, make_odometry(40.0, 0.0, limit + 0.5), 0.0, true, limit);
+  for (const auto & pt : traj) {
+    EXPECT_LE(pt.longitudinal_velocity_mps, limit + 1e-3);
+  }
+
+  // a max speed of zero must not be overridden by the pull-out speed while the ego slows down
+  params.set_engage_speed = true;
+  params.smooth_velocities = true;
+  params.target_pull_out_speed_mps = 0.25;
+  params.target_pull_out_acc_mps2 = 0.5;
+  VelocitySmoother stopping_smoother(
+    params, node->get_logger(), node->get_clock(), vehicle_info, jerk_filtered_smoother);
+  traj = make_straight_trajectory(200, 1.0, v0);
+  stopping_smoother.optimize(traj, make_odometry(0.0, 0.0, 0.1), 0.0, true, 0.0);
+  for (const auto & pt : traj) {
+    EXPECT_LE(pt.longitudinal_velocity_mps, 0.1 + 1e-3);
+  }
+
+  // closed loop: an ego that follows the planned speed must stop within the deceleration limit
+  // (min_acc -1.0 in the config) and stay stopped
+  VelocitySmoother closed_loop_smoother(
+    params, node->get_logger(), node->get_clock(), vehicle_info, jerk_filtered_smoother);
+  constexpr double dt = 0.1;
+  double x = 0.0;
+  double v = 9.5;
+  double a = 0.0;
+  double a_min = 0.0;
+  double x_at_20s = 0.0;
+  for (int i = 0; i < 300; ++i) {
+    traj = make_straight_trajectory(100, 1.0, v0);  // coarse like the planned path
+    closed_loop_smoother.optimize(traj, make_odometry(x, 0.0, v), a, true, 0.0);
+    // the ego reaches the planned speed of the position it arrives at after dt
+    const double x_next = x + v * dt;
+    const auto next = std::find_if(
+      traj.begin(), traj.end(), [&](const auto & pt) { return pt.pose.position.x >= x_next; });
+    double v_plan = next == traj.end() ? 0.0 : next->longitudinal_velocity_mps;
+    if (next != traj.begin() && next != traj.end()) {
+      const auto & prev = *(next - 1);
+      const double ratio =
+        (x_next - prev.pose.position.x) / (next->pose.position.x - prev.pose.position.x);
+      v_plan = prev.longitudinal_velocity_mps +
+               ratio * (next->longitudinal_velocity_mps - prev.longitudinal_velocity_mps);
+    }
+    a = (v_plan - v) / dt;
+    a_min = std::min(a_min, a);
+    v = v_plan;
+    x += v * dt;
+    if (i == 199) {
+      x_at_20s = x;
+    }
+  }
+  EXPECT_LT(v, 0.01);
+  EXPECT_LT(x - x_at_20s, 0.05);
+  EXPECT_GT(a_min, -1.1);
+
+  // an ego held still by the controller while the plan still moved must get a zero plan, otherwise
+  // the nonzero commanded speed keeps the motion state of the AD API at MOVING
+  VelocitySmoother held_smoother(
+    params, node->get_logger(), node->get_clock(), vehicle_info, jerk_filtered_smoother);
+  traj = make_straight_trajectory(100, 1.0, v0);
+  held_smoother.optimize(traj, make_odometry(0.0, 0.0, 1.1), 0.0, true, 0.0);
+  traj = make_straight_trajectory(100, 1.0, v0);
+  held_smoother.optimize(traj, make_odometry(0.0, 0.0, 0.0), 0.0, true, 0.0);
+  for (const auto & pt : traj) {
+    EXPECT_LT(pt.longitudinal_velocity_mps, 0.01);
+  }
+
+  rclcpp::shutdown();
 }
 
 TEST(VelocitySmootherTest, LimitSpeedDoesNotAffectSlowerPoints)
