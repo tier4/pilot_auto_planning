@@ -57,8 +57,12 @@ protected:
   void on_initialize(const TrajectoryModifierParams & params) override;
 
 private:
+  void publish_current_velocity_limit(
+    const autoware_internal_planning_msgs::msg::VelocityLimit & velocity_limit);
+
   PublisherHandle<autoware_internal_debug_msgs::msg::StringStamped> profile_reset_pub_;
   PublisherHandle<autoware_planning_msgs::msg::Trajectory> debug_trajectory_pub_;
+  PublisherHandle<autoware_internal_planning_msgs::msg::VelocityLimit> pub_current_velocity_limit_;
   detail::VelocityLimitConstraints constraints_;
   detail::FixedProfileMemory fixed_profile_;
   detail::ProfileStart last_profile_start_{detail::ProfileStart::Measured};
