@@ -341,14 +341,14 @@ bool ObstacleStop::apply_cruise(
   last_cruise_profile_start_ = start.start;
   if (detail::is_reset(start.start)) {
     RCLCPP_DEBUG(
-      get_node_ptr()->get_logger(),
+      get_logger(),
       "[TM ObstacleStop] Cruise candidate %zu restarted from the measured ego state (%s)",
       input.candidate_index, detail::to_string(start.start));
     StringStamped reset;
     reset.stamp = get_clock()->now();
     reset.data = "plugin=" + get_name() + " candidate=" + std::to_string(input.candidate_index) +
                  " reason=" + detail::to_string(start.start);
-    cruise_profile_reset_pub_->publish(reset);
+    cruise_profile_reset_pub_(reset);
   }
 
   const detail::VelocityLimitConstraints constraints{
