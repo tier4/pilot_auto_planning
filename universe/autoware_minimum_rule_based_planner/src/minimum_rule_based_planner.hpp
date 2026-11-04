@@ -60,6 +60,7 @@ public:
     PredictedObjects::ConstSharedPtr predicted_objects_ptr;
     PointCloud2::ConstSharedPtr obstacle_pointcloud_ptr;
     PathWithLaneId::ConstSharedPtr test_path_with_lane_id_ptr;
+    VelocityLimit::ConstSharedPtr external_velocity_limit_ptr;
   };
 
 private:

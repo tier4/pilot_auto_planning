@@ -14,6 +14,7 @@
 
 #include "velocity_smoother.hpp"
 
+#include <autoware/motion_utils/distance/distance.hpp>
 #include <autoware/motion_utils/trajectory/trajectory.hpp>
 #include <autoware_utils_math/unit_conversion.hpp>
 
@@ -46,12 +47,14 @@ VelocitySmoother::VelocitySmoother(
 
 void VelocitySmoother::optimize(
   TrajectoryPoints & traj_points, const nav_msgs::msg::Odometry & current_odometry,
-  double current_acceleration, const bool update_prev_output)
+  double current_acceleration, const bool update_prev_output,
+  const std::optional<double> external_velocity_limit_mps)
 {
   const double current_speed = current_odometry.twist.twist.linear.x;
   const double & target_pull_out_speed_mps = params_.target_pull_out_speed_mps;
   const double & target_pull_out_acc_mps2 = params_.target_pull_out_acc_mps2;
-  const double & max_speed_mps = params_.max_speed_mps;
+  const double max_speed_mps =
+    std::min(params_.max_speed_mps, external_velocity_limit_mps.value_or(params_.max_speed_mps));
 
   // 1. Limit lateral acceleration (disabled by default)
   if (params_.limit_lateral_acceleration) {
@@ -62,11 +65,17 @@ void VelocitySmoother::optimize(
   auto initial_motion_speed = current_speed;
   auto initial_motion_acc = current_acceleration;
 
-  if (current_speed < target_pull_out_speed_mps) {
+  // Pull out only when the max speed allows it, like autoware_velocity_smoother's engage. Otherwise
+  // the pull-out speed overrides a max speed of zero every cycle and the ego keeps creeping. A slow
+  // ego that may not pull out keeps the measured state: prev_output would feed its own initial
+  // speed back and hold a nonzero planned speed while the ego stands still.
+  const bool slow = current_speed < target_pull_out_speed_mps;
+  const bool pull_out = slow && max_speed_mps >= target_pull_out_speed_mps;
+  if (pull_out) {
     // Vehicle is slow (starting/pull-out): use pull-out parameters
     initial_motion_speed = target_pull_out_speed_mps;
     initial_motion_acc = target_pull_out_acc_mps2;
-  } else if (!prev_output_.empty()) {
+  } else if (!slow && !prev_output_.empty()) {
     // Vehicle is moving: use prev_output for temporal consistency when tracking is good
     const auto projected =
       calc_projected_trajectory_point_from_ego(prev_output_, current_odometry.pose.pose);
@@ -82,7 +91,7 @@ void VelocitySmoother::optimize(
   }
 
   // 3. Engage speed: clamp minimum velocity during pull-out
-  if (params_.set_engage_speed && (current_speed < target_pull_out_speed_mps)) {
+  if (params_.set_engage_speed && pull_out) {
     // Check distance to stop point to avoid engaging when obstacle is ahead
     const auto closest_idx =
       autoware::motion_utils::findNearestIndex(traj_points, current_odometry.pose.pose.position);
@@ -107,7 +116,40 @@ void VelocitySmoother::optimize(
 
   // 4. Set max velocity
   if (params_.limit_speed) {
-    set_max_velocity(traj_points, static_cast<float>(max_speed_mps));
+    // Same as autoware_safety_planner's external_velocity_limit: a max speed the ego does not meet
+    // yet applies from the braking distance onwards; once met, it applies everywhere until it
+    // changes. Only the go stream updates the latch.
+    if (update_prev_output) {
+      if (satisfied_max_speed_mps_ != max_speed_mps) {
+        satisfied_max_speed_mps_.reset();
+      }
+      if (initial_motion_speed <= max_speed_mps) {
+        satisfied_max_speed_mps_ = max_speed_mps;
+      }
+    }
+    const auto braking_distance =
+      satisfied_max_speed_mps_ == max_speed_mps
+        ? std::nullopt
+        : calc_braking_distance(max_speed_mps, initial_motion_speed, initial_motion_acc);
+    if (braking_distance && traj_points.size() > 1) {
+      // a positive acceleration keeps raising the speed until it is brought to zero
+      const double speed_before_limit =
+        initial_motion_acc > 0.0
+          ? initial_motion_speed + 0.5 * initial_motion_acc * initial_motion_acc /
+                                     std::abs(jerk_filtered_smoother_->getMinJerk())
+          : initial_motion_speed;
+      set_max_velocity(traj_points, static_cast<float>(speed_before_limit));
+      // Insert a point exactly at the braking distance: a limit starting at a point beyond it moves
+      // with a slow ego and a zero max speed never stops it; one before it brakes harder than
+      // needed.
+      const auto limit_idx = autoware::motion_utils::insertTargetPoint(
+        current_odometry.pose.pose, *braking_distance, traj_points);
+      if (limit_idx) {
+        set_max_velocity(traj_points, static_cast<float>(max_speed_mps), *limit_idx);
+      }
+    } else {
+      set_max_velocity(traj_points, static_cast<float>(max_speed_mps));
+    }
   }
 
   // 5. Filter velocity using JerkFilteredSmoother
@@ -170,7 +212,21 @@ void VelocitySmoother::clamp_velocities(
     });
 }
 
-void VelocitySmoother::set_max_velocity(TrajectoryPoints & traj_points, const float max_velocity)
+std::optional<double> VelocitySmoother::calc_braking_distance(
+  const double max_speed_mps, const double initial_speed, const double initial_acc) const
+{
+  if (!jerk_filtered_smoother_) {
+    return std::nullopt;
+  }
+  // No margin, unlike autoware_safety_planner: the distance is recomputed every cycle, so a margin
+  // would keep the point where a zero max speed applies ahead of the ego and it would never stop.
+  return autoware::motion_utils::calcDecelDistWithJerkAndAccConstraints(
+    initial_speed, max_speed_mps, initial_acc, jerk_filtered_smoother_->getMinDecel(),
+    jerk_filtered_smoother_->getMaxJerk(), jerk_filtered_smoother_->getMinJerk());
+}
+
+void VelocitySmoother::set_max_velocity(
+  TrajectoryPoints & traj_points, const float max_velocity, const size_t start_idx)
 {
   if (traj_points.empty()) {
     return;
@@ -204,7 +260,7 @@ void VelocitySmoother::set_max_velocity(TrajectoryPoints & traj_points, const fl
   size_t segment_start = 0;
   bool in_segment = false;
 
-  for (size_t i = 0; i < traj_points.size(); ++i) {
+  for (size_t i = start_idx; i < traj_points.size(); ++i) {
     const bool exceeds_max = traj_points[i].longitudinal_velocity_mps > max_velocity;
     if (exceeds_max && !in_segment) {
       segment_start = i;

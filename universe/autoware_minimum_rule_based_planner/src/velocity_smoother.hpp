@@ -57,15 +57,26 @@ public:
   //! initial motion. Only one trajectory stream (the always-published go trajectory) may update
   //! it; secondary streams (the stop trajectory) must pass false, otherwise their decelerating
   //! profile leaks into the other stream's initial speed on the next cycle.
+  //! @param external_velocity_limit_mps external speed limit; the effective max speed is the
+  //! smaller of this and params.max_speed_mps.
   void optimize(
     TrajectoryPoints & traj_points, const nav_msgs::msg::Odometry & current_odometry,
-    double current_acceleration, bool update_prev_output = true);
+    double current_acceleration, bool update_prev_output = true,
+    std::optional<double> external_velocity_limit_mps = std::nullopt);
 
 private:
   static void clamp_velocities(
     TrajectoryPoints & traj_points, float min_velocity, float min_acceleration);
 
-  static void set_max_velocity(TrajectoryPoints & traj_points, float max_velocity);
+  //! @param start_idx points before this index are left untouched
+  static void set_max_velocity(
+    TrajectoryPoints & traj_points, float max_velocity, size_t start_idx = 0);
+
+  //! Distance ahead of ego at which a lowered max speed starts to apply, so that the ego
+  //! decelerates within the smoother's acceleration and jerk limits instead of at once.
+  //! nullopt when there is no smoother to take those limits from.
+  std::optional<double> calc_braking_distance(
+    double max_speed_mps, double initial_speed, double initial_acc) const;
 
   static void limit_lateral_acceleration(
     TrajectoryPoints & traj_points, double max_lateral_accel_mps2,
@@ -83,6 +94,8 @@ private:
   rclcpp::Clock::SharedPtr clock_;
   std::shared_ptr<autoware::velocity_smoother::JerkFilteredSmoother> jerk_filtered_smoother_;
   TrajectoryPoints prev_output_;
+  //! the max speed the ego has already been seen to meet, held until the max speed changes
+  std::optional<double> satisfied_max_speed_mps_;
 };
 
 }  // namespace autoware::minimum_rule_based_planner

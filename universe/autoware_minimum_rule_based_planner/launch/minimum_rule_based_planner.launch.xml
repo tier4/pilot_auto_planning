@@ -22,6 +22,8 @@
   <arg name="input_acceleration" default="~/input/acceleration"/>
   <arg name="input_objects" default="~/input/objects"/>
   <arg name="input_pointcloud" default="~/input/pointcloud"/>
+  <arg name="input_external_velocity_limit_mps" default="~/input/external_velocity_limit_mps"/>
+  <arg name="input_velocity_limit_clear_command" default="~/input/velocity_limit_clear_command"/>
   <arg name="output_candidate_trajectories" default="~/output/candidate_trajectories"/>
 
   <include file="$(find-pkg-share autoware_agnocast_wrapper)/launch/agnocast_env.launch.xml"/>
@@ -42,6 +44,8 @@
     <remap from="~/input/acceleration" to="$(var input_acceleration)"/>
     <remap from="~/input/objects" to="$(var input_objects)"/>
     <remap from="~/input/pointcloud" to="$(var input_pointcloud)"/>
+    <remap from="~/input/external_velocity_limit_mps" to="$(var input_external_velocity_limit_mps)"/>
+    <remap from="~/input/velocity_limit_clear_command" to="$(var input_velocity_limit_clear_command)"/>
     <remap from="~/output/candidate_trajectories" to="$(var output_candidate_trajectories)"/>
   </node>
 </launch>
