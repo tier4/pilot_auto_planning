@@ -39,7 +39,7 @@ jobs:
       combined: ${{ steps.plan.outputs.combined }}
     steps:
       - name: Check out this repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
 
       - name: Install dependencies
         run: python3 -m pip install --disable-pip-version-check pyyaml
@@ -62,7 +62,7 @@ jobs:
         source: ${{ fromJson(needs.plan.outputs.sources) }}
     steps:
       - name: Check out this repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
 
       - name: Install dependencies
         run: |
@@ -73,14 +73,14 @@ jobs:
       - name: Generate token
         id: generate-token
         if: env.DRY_RUN != 'true'
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@v3.3.0
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Set git config
         if: env.DRY_RUN != 'true'
-        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1.69.1
         with:
           token: ${{ steps.generate-token.outputs.token }}
 
@@ -109,7 +109,7 @@ jobs:
         target: ${{ fromJson(needs.plan.outputs.combined) }}
     steps:
       - name: Check out this repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
 
       - name: Install dependencies
         run: python3 -m pip install --disable-pip-version-check pyyaml
@@ -118,14 +118,14 @@ jobs:
       - name: Generate token
         id: generate-token
         if: env.DRY_RUN != 'true'
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@v3.3.0
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Set git config
         if: env.DRY_RUN != 'true'
-        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1.69.1
         with:
           token: ${{ steps.generate-token.outputs.token }}
 
