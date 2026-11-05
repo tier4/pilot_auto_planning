@@ -250,15 +250,15 @@ TEST_F(VelocityLimitPluginSimulation, MapPluginReusesCoreRouteAndRebuildsChanged
   const sim::TrajectoryPoints points;
 
   ASSERT_TRUE(plugin.is_trajectory_modification_required(points, data));
-  const auto first = context_->extended_route_cache.get_or_create(map_, map_bin_, *route_, false);
+  const auto first = context_->extended_route_cache.get_or_create(map_, *map_bin_, *route_, false);
   ASSERT_NE(first, nullptr);
   EXPECT_EQ(first->getRouteMapRoutingGraph(), nullptr);
   ASSERT_TRUE(plugin.is_trajectory_modification_required(points, data));
-  EXPECT_EQ(context_->extended_route_cache.get_or_create(map_, map_bin_, *route_, false), first);
+  EXPECT_EQ(context_->extended_route_cache.get_or_create(map_, *map_bin_, *route_, false), first);
 
   route_->segments.pop_back();
   ASSERT_TRUE(plugin.is_trajectory_modification_required(points, data));
-  const auto second = context_->extended_route_cache.get_or_create(map_, map_bin_, *route_, false);
+  const auto second = context_->extended_route_cache.get_or_create(map_, *map_bin_, *route_, false);
   ASSERT_NE(second, first);
   EXPECT_FALSE(second->getRouteMap()->laneletLayer.exists(lanelet_id(lanelet_count - 1)));
 }

@@ -234,12 +234,12 @@ protected:
 TEST_F(ExtendedRouteHandlerTest, CacheSharesVelocityDataAndUpgradesForMppi)
 {
   ExtendedRouteCache cache;
-  const auto velocity_handler = cache.get_or_create(source_map_, map_bin_, route_, false);
+  const auto velocity_handler = cache.get_or_create(source_map_, *map_bin_, route_, false);
   ASSERT_NE(velocity_handler, nullptr);
   EXPECT_EQ(velocity_handler->getOriginalMap(), source_map_);
   EXPECT_EQ(
     velocity_handler->getExtendedRoutingGraph(),
-    cache.get_or_create(source_map_, map_bin_, route_, false)->getExtendedRoutingGraph());
+    cache.get_or_create(source_map_, *map_bin_, route_, false)->getExtendedRoutingGraph());
   EXPECT_EQ(velocity_handler->getRouteMapRoutingGraph(), nullptr);
   EXPECT_TRUE(velocity_handler->get_original_route_bounds().first.empty());
 
@@ -247,7 +247,7 @@ TEST_F(ExtendedRouteHandlerTest, CacheSharesVelocityDataAndUpgradesForMppi)
   ASSERT_TRUE(limit);
   EXPECT_DOUBLE_EQ(*limit, k_low_speed_mps);
 
-  const auto full_handler = cache.get_or_create(source_map_, map_bin_, route_, true);
+  const auto full_handler = cache.get_or_create(source_map_, *map_bin_, route_, true);
   EXPECT_EQ(full_handler, velocity_handler);
   ASSERT_NE(full_handler->getRouteMapRoutingGraph(), nullptr);
   const auto & bounds = full_handler->get_extended_route_bounds();
@@ -255,20 +255,20 @@ TEST_F(ExtendedRouteHandlerTest, CacheSharesVelocityDataAndUpgradesForMppi)
   ASSERT_FALSE(bounds.second.empty());
   EXPECT_EQ(bounds.first.size(), handler_->get_extended_route_bounds().first.size());
   EXPECT_EQ(bounds.second.size(), handler_->get_extended_route_bounds().second.size());
-  EXPECT_EQ(cache.get_or_create(source_map_, map_bin_, route_, true), full_handler);
+  EXPECT_EQ(cache.get_or_create(source_map_, *map_bin_, route_, true), full_handler);
 }
 
 TEST_F(ExtendedRouteHandlerTest, CacheRebuildsChangedRouteWithSameUuid)
 {
   ExtendedRouteCache cache;
-  const auto first = cache.get_or_create(source_map_, map_bin_, route_, false);
+  const auto first = cache.get_or_create(source_map_, *map_bin_, route_, false);
   auto republished = route_;
   republished.header.stamp.sec = 1;
-  EXPECT_EQ(cache.get_or_create(source_map_, map_bin_, republished, false), first);
+  EXPECT_EQ(cache.get_or_create(source_map_, *map_bin_, republished, false), first);
 
   auto changed = route_;
   changed.segments.pop_back();
-  const auto second = cache.get_or_create(source_map_, map_bin_, changed, false);
+  const auto second = cache.get_or_create(source_map_, *map_bin_, changed, false);
   ASSERT_NE(second, first);
   EXPECT_EQ(second->getExtendedRoutingGraph(), first->getExtendedRoutingGraph());
   EXPECT_FALSE(second->getRouteMap()->laneletLayer.exists(k_main_ids[2]));
@@ -278,7 +278,7 @@ TEST_F(ExtendedRouteHandlerTest, CacheRebuildsChangedRouteWithSameUuid)
 TEST_F(ExtendedRouteHandlerTest, CacheRebuildsWhenMapChanges)
 {
   ExtendedRouteCache cache;
-  const auto first = cache.get_or_create(source_map_, map_bin_, route_, false);
+  const auto first = cache.get_or_create(source_map_, *map_bin_, route_, false);
 
   auto next_map = make_map();
   next_map->laneletLayer.get(k_main_ids[0]).setAttribute("speed_limit", "36");
@@ -287,7 +287,7 @@ TEST_F(ExtendedRouteHandlerTest, CacheRebuildsWhenMapChanges)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   lanelet::utils::conversion::toBinMsg(next_map, next_bin.get());
 #pragma GCC diagnostic pop
-  const auto second = cache.get_or_create(next_map, next_bin, route_, false);
+  const auto second = cache.get_or_create(next_map, *next_bin, route_, false);
   ASSERT_NE(second, first);
   EXPECT_NE(second->getExtendedRoutingGraph(), first->getExtendedRoutingGraph());
   const auto limit = second->get_velocity_limit(make_point(5.0, 0.0));
@@ -298,13 +298,13 @@ TEST_F(ExtendedRouteHandlerTest, CacheRebuildsWhenMapChanges)
 TEST_F(ExtendedRouteHandlerTest, CacheAcceptsBinaryMapWhenDecodedMapIsUnavailable)
 {
   ExtendedRouteCache cache;
-  const auto fast_handler = cache.get_or_create(nullptr, map_bin_, route_, false);
+  const auto fast_handler = cache.get_or_create(nullptr, *map_bin_, route_, false);
   ASSERT_NE(fast_handler, nullptr);
   ASSERT_NE(fast_handler->getOriginalMap(), nullptr);
   const auto limit = fast_handler->get_velocity_limit(make_point(5.0, 0.0));
   ASSERT_TRUE(limit);
   EXPECT_DOUBLE_EQ(*limit, k_road_speed_mps);
-  EXPECT_EQ(cache.get_or_create(nullptr, map_bin_, route_, false), fast_handler);
+  EXPECT_EQ(cache.get_or_create(nullptr, *map_bin_, route_, false), fast_handler);
   const auto original_handler = fast_handler->getOriginalRouteHandler();
   ASSERT_NE(original_handler, nullptr);
   EXPECT_EQ(original_handler->getRouteUuid(), route_.uuid);

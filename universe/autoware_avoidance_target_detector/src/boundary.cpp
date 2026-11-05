@@ -651,24 +651,29 @@ void ExtendedRouteHandler::create_boundary_map()
   boundary_map_ready_ = true;
 }
 
-std::shared_ptr<ExtendedRouteHandler> ExtendedRouteCache::get_or_create(
-  const lanelet::LaneletMapPtr & map, const LaneletMapBin::ConstSharedPtr & binary_map,
-  const LaneletRoute & route, const bool include_boundaries)
+bool ExtendedRouteCache::is_same_binary_map(const LaneletMapBin & binary_map) const
 {
-  if (!binary_map) {
-    return nullptr;
-  }
+  // The stamp guards against a new message being allocated at the address of a freed one.
+  return current_binary_map_address_ == &binary_map &&
+         current_binary_map_stamp_ == binary_map.header.stamp;
+}
+
+std::shared_ptr<ExtendedRouteHandler> ExtendedRouteCache::get_or_create(
+  const lanelet::LaneletMapPtr & map, const LaneletMapBin & binary_map, const LaneletRoute & route,
+  const bool include_boundaries)
+{
   std::lock_guard<std::mutex> lock(mutex_);
-  const bool map_changed =
-    !map_context_ || current_binary_map_ != binary_map || current_map_ != map;
+  const bool map_changed = !map_context_ || !is_same_binary_map(binary_map) || current_map_ != map;
   auto next_context = map_context_;
   if (map_changed) {
     auto decoded_map = map;
     if (!decoded_map) {
       decoded_map = autoware::experimental::lanelet2_utils::remove_const(
-        autoware::experimental::lanelet2_utils::from_autoware_map_msgs(*binary_map));
+        autoware::experimental::lanelet2_utils::from_autoware_map_msgs(binary_map));
     }
-    next_context = std::make_shared<ExtendedMapContext>(decoded_map, binary_map);
+    // Keep an owned copy: the caller's holder (e.g. agnocast message_ptr) cannot be shared.
+    next_context = std::make_shared<ExtendedMapContext>(
+      decoded_map, std::make_shared<const LaneletMapBin>(binary_map));
   }
   if (
     map_changed || !current_handler_ || !current_route_ ||
@@ -680,7 +685,8 @@ std::shared_ptr<ExtendedRouteHandler> ExtendedRouteCache::get_or_create(
     }
     map_context_ = std::move(next_context);
     current_map_ = map;
-    current_binary_map_ = binary_map;
+    current_binary_map_address_ = &binary_map;
+    current_binary_map_stamp_ = binary_map.header.stamp;
     current_handler_ = std::move(next_handler);
     current_route_ = route;
   } else if (include_boundaries) {

@@ -18,6 +18,7 @@
 #include "rtree_filtering.hpp"
 
 #include <autoware/route_handler/route_handler.hpp>
+#include <builtin_interfaces/msg/time.hpp>
 
 #include <autoware_map_msgs/msg/lanelet_map_bin.hpp>
 #include <autoware_planning_msgs/msg/lanelet_route.hpp>
@@ -243,14 +244,23 @@ private:
 class ExtendedRouteCache
 {
 public:
+  /**
+   * @brief Return the cached handler, rebuilding it when the map or route changes.
+   * @param binary_map Map message. Taken by reference so that both std::shared_ptr and
+   *        agnocast message_ptr holders can pass it; it is copied only when the map changes.
+   */
   [[nodiscard]] std::shared_ptr<ExtendedRouteHandler> get_or_create(
-    const lanelet::LaneletMapPtr & map, const LaneletMapBin::ConstSharedPtr & binary_map,
+    const lanelet::LaneletMapPtr & map, const LaneletMapBin & binary_map,
     const LaneletRoute & route, bool include_boundaries);
 
 private:
+  [[nodiscard]] bool is_same_binary_map(const LaneletMapBin & binary_map) const;
+
   std::mutex mutex_;
   lanelet::LaneletMapPtr current_map_;
-  LaneletMapBin::ConstSharedPtr current_binary_map_;
+  // Identity of the last received map message. Only compared, never dereferenced.
+  const LaneletMapBin * current_binary_map_address_{nullptr};
+  builtin_interfaces::msg::Time current_binary_map_stamp_;
   std::shared_ptr<const ExtendedMapContext> map_context_;
   std::optional<LaneletRoute> current_route_;
   std::shared_ptr<ExtendedRouteHandler> current_handler_;

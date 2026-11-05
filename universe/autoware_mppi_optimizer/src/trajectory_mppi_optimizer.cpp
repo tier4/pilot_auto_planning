@@ -406,7 +406,7 @@ void TrajectoryMppiOptimizer::update_route_context(
   const autoware::trajectory_processor::TrajectoryProcessorData & data)
 {
   auto next_handler = context_->extended_route_cache.get_or_create(
-    data.lanelet_map, data.lanelet_map_bin, *data.route, true);
+    data.lanelet_map, *data.lanelet_map_bin, *data.route, true);
   if (next_handler == extended_route_handler_) {
     return;
   }

@@ -92,7 +92,7 @@ bool MapVelocityLimits::is_trajectory_modification_required(
     return false;
   }
   extended_route_handler_ = context_->extended_route_cache.get_or_create(
-    input.lanelet_map, input.lanelet_map_bin, *input.route, false);
+    input.lanelet_map, *input.lanelet_map_bin, *input.route, false);
   return true;
 }
 
