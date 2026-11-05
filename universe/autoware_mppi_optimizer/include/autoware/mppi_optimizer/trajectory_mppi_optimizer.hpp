@@ -237,9 +237,6 @@ private:
   std::optional<autoware::avoidance_target_detector::ObjectSelectionResult<
     autoware_perception_msgs::msg::TrackedObjects>>
     selection_result_;
-  AUTOWARE_MESSAGE_CONST_SHARED_PTR(autoware_map_msgs::msg::LaneletMapBin) current_map_;
-  std::optional<unique_identifier_msgs::msg::UUID> current_route_uuid_;
-  std::vector<autoware_planning_msgs::msg::LaneletSegment> current_route_segments_;
   PreferredLaneCenterlineSelector preferred_lane_selector_;
   double preferred_lane_max_acceleration_{0.0};
   double object_filter_margin_m_{0.0};
