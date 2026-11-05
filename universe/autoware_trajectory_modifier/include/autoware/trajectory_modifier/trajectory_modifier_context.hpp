@@ -19,6 +19,7 @@
 #include <autoware/agnocast_wrapper/node.hpp>
 #include <autoware/agnocast_wrapper/polling_subscriber.hpp>
 #include <autoware/agnocast_wrapper/tf2.hpp>
+#include <autoware/avoidance_target_detector/boundary.hpp>
 #include <autoware_utils_rclcpp/polling_subscriber.hpp>
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -140,9 +141,6 @@ struct TrajectoryModifierContext
   /// Shared map and route preparation for the map-limit plugin and MPPI.
   autoware::avoidance_target_detector::ExtendedRouteCache extended_route_cache;
 
-  /// @brief Drain the external velocity limit and clear command subscriptions into the shared
-  /// state. The agnocast-compatible polling subscribers carry no DDS source timestamp, so when a
-  /// limit and a clear command are pending together the clear command takes precedence.
   void refresh_external_velocity_limit()
   {
     if (const auto limit = external_limit_sub->take_data()) {
