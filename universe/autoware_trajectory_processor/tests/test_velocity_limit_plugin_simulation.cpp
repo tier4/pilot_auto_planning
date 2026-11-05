@@ -170,9 +170,11 @@ protected:
     context_ = std::make_shared<TrajectoryProcessorContext>(node_.get());
 
     map_ = make_straight_road();
-    map_bin_ = std::make_shared<LaneletMapBin>(
+    auto bin = std::make_shared<LaneletMapBin>(
       autoware::experimental::lanelet2_utils::to_autoware_map_msgs(map_));
-    map_bin_->header.frame_id = "map";
+    bin->header.frame_id = "map";
+    map_bin_ = AUTOWARE_MESSAGE_CONST_SHARED_PTR(LaneletMapBin)(
+      std::shared_ptr<const LaneletMapBin>(std::move(bin)));
     route_ = std::make_shared<LaneletRoute>(make_route());
   }
 
@@ -237,7 +239,7 @@ protected:
   std::shared_ptr<autoware_utils_debug::TimeKeeper> time_keeper_;
   std::shared_ptr<TrajectoryProcessorContext> context_;
   lanelet::LaneletMapPtr map_;
-  std::shared_ptr<LaneletMapBin> map_bin_;
+  AUTOWARE_MESSAGE_CONST_SHARED_PTR(LaneletMapBin) map_bin_;
   std::shared_ptr<LaneletRoute> route_;
 };
 

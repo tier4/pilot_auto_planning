@@ -47,6 +47,11 @@ using autoware_planning_msgs::msg::LaneletPrimitive;
 using autoware_planning_msgs::msg::LaneletSegment;
 using autoware_planning_msgs::msg::TrajectoryPoint;
 
+LaneletMapBinConstMsgPtr make_map_bin_msg_ptr(std::shared_ptr<LaneletMapBin> bin)
+{
+  return LaneletMapBinConstMsgPtr(std::shared_ptr<const LaneletMapBin>(std::move(bin)));
+}
+
 constexpr std::array<lanelet::Id, 3> k_main_ids{101, 102, 103};
 constexpr std::array<lanelet::Id, 3> k_shoulder_ids{201, 202, 203};
 constexpr lanelet::Id k_disconnected_id = 999;
@@ -193,12 +198,13 @@ protected:
     source_map_ = make_map();
     route_ = make_route();
 
-    map_bin_ = std::make_shared<LaneletMapBin>();
+    auto bin = std::make_shared<LaneletMapBin>();
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    lanelet::utils::conversion::toBinMsg(source_map_, map_bin_.get());
+    lanelet::utils::conversion::toBinMsg(source_map_, bin.get());
 #pragma GCC diagnostic pop
-    map_bin_->header.frame_id = "map";
+    bin->header.frame_id = "map";
+    map_bin_ = make_map_bin_msg_ptr(std::move(bin));
 
     handler_ = std::make_shared<ExtendedRouteHandler>(*map_bin_, route_);
     handler_->create_map();
@@ -226,7 +232,7 @@ protected:
   }
 
   lanelet::LaneletMapPtr source_map_;
-  std::shared_ptr<LaneletMapBin> map_bin_;
+  LaneletMapBinConstMsgPtr map_bin_;
   LaneletRoute route_;
   std::shared_ptr<ExtendedRouteHandler> handler_;
 };
@@ -287,7 +293,8 @@ TEST_F(ExtendedRouteHandlerTest, CacheRebuildsWhenMapChanges)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   lanelet::utils::conversion::toBinMsg(next_map, next_bin.get());
 #pragma GCC diagnostic pop
-  const auto second = cache.get_or_create(next_map, next_bin, route_, false);
+  const auto second =
+    cache.get_or_create(next_map, make_map_bin_msg_ptr(std::move(next_bin)), route_, false);
   ASSERT_NE(second, first);
   EXPECT_NE(second->getExtendedRoutingGraph(), first->getExtendedRoutingGraph());
   const auto limit = second->get_velocity_limit(make_point(5.0, 0.0));

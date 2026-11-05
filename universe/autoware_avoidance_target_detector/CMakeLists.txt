@@ -9,6 +9,7 @@ ament_auto_add_library(${PROJECT_NAME} SHARED
   src/boundary.cpp
   src/parameter.cpp
 )
+autoware_agnocast_wrapper_setup(${PROJECT_NAME})
 
 if(BUILD_TESTING)
   ament_auto_add_gtest(test_boundary
@@ -17,6 +18,7 @@ if(BUILD_TESTING)
   target_link_libraries(test_boundary
     ${PROJECT_NAME}
   )
+  autoware_agnocast_wrapper_setup(test_boundary)
 
   ament_auto_add_gtest(test_update_objects
     test/test_update_objects.cpp
