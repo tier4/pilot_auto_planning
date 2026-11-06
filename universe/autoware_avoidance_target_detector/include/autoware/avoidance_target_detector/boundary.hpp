@@ -17,6 +17,7 @@
 
 #include "rtree_filtering.hpp"
 
+#include <autoware/agnocast_wrapper/autoware_agnocast_wrapper.hpp>
 #include <autoware/route_handler/route_handler.hpp>
 
 #include <autoware_map_msgs/msg/lanelet_map_bin.hpp>
@@ -48,6 +49,7 @@ using autoware_map_msgs::msg::LaneletMapBin;
 using autoware_planning_msgs::msg::LaneletRoute;
 using autoware_planning_msgs::msg::Path;
 using autoware_planning_msgs::msg::Trajectory;
+using LaneletMapBinConstMsgPtr = AUTOWARE_MESSAGE_CONST_SHARED_PTR(LaneletMapBin);
 
 namespace traffic_rules
 {
@@ -118,19 +120,19 @@ class ExtendedMapContext
 {
 public:
   ExtendedMapContext(
-    lanelet::LaneletMapPtr map, LaneletMapBin::ConstSharedPtr binary_map = nullptr);
+    lanelet::LaneletMapPtr map, LaneletMapBinConstMsgPtr binary_map = {});
 
   [[nodiscard]] const lanelet::LaneletMapPtr & map() const { return map_; }
   [[nodiscard]] const lanelet::routing::RoutingGraphConstPtr & routing_graph() const
   {
     return routing_graph_;
   }
-  [[nodiscard]] const LaneletMapBin::ConstSharedPtr & binary_map() const { return binary_map_; }
+  [[nodiscard]] const LaneletMapBinConstMsgPtr & binary_map() const { return binary_map_; }
 
 private:
   lanelet::LaneletMapPtr map_;
   lanelet::routing::RoutingGraphConstPtr routing_graph_;
-  LaneletMapBin::ConstSharedPtr binary_map_;
+  LaneletMapBinConstMsgPtr binary_map_;
 };
 
 class ExtendedRouteHandler
@@ -244,13 +246,13 @@ class ExtendedRouteCache
 {
 public:
   [[nodiscard]] std::shared_ptr<ExtendedRouteHandler> get_or_create(
-    const lanelet::LaneletMapPtr & map, const LaneletMapBin::ConstSharedPtr & binary_map,
+    const lanelet::LaneletMapPtr & map, const LaneletMapBinConstMsgPtr & binary_map,
     const LaneletRoute & route, bool include_boundaries);
 
 private:
   std::mutex mutex_;
   lanelet::LaneletMapPtr current_map_;
-  LaneletMapBin::ConstSharedPtr current_binary_map_;
+  LaneletMapBinConstMsgPtr current_binary_map_;
   std::shared_ptr<const ExtendedMapContext> map_context_;
   std::optional<LaneletRoute> current_route_;
   std::shared_ptr<ExtendedRouteHandler> current_handler_;

@@ -496,7 +496,7 @@ void ExtendedLaneletSegments::build(
 }
 
 ExtendedMapContext::ExtendedMapContext(
-  lanelet::LaneletMapPtr map, LaneletMapBin::ConstSharedPtr binary_map)
+  lanelet::LaneletMapPtr map, LaneletMapBinConstMsgPtr binary_map)
 : map_{std::move(map)}, binary_map_{std::move(binary_map)}
 {
   if (!map_) {
@@ -652,7 +652,7 @@ void ExtendedRouteHandler::create_boundary_map()
 }
 
 std::shared_ptr<ExtendedRouteHandler> ExtendedRouteCache::get_or_create(
-  const lanelet::LaneletMapPtr & map, const LaneletMapBin::ConstSharedPtr & binary_map,
+  const lanelet::LaneletMapPtr & map, const LaneletMapBinConstMsgPtr & binary_map,
   const LaneletRoute & route, const bool include_boundaries)
 {
   if (!binary_map) {
@@ -660,7 +660,7 @@ std::shared_ptr<ExtendedRouteHandler> ExtendedRouteCache::get_or_create(
   }
   std::lock_guard<std::mutex> lock(mutex_);
   const bool map_changed =
-    !map_context_ || current_binary_map_ != binary_map || current_map_ != map;
+    !map_context_ || current_binary_map_.get() != binary_map.get() || current_map_ != map;
   auto next_context = map_context_;
   if (map_changed) {
     auto decoded_map = map;
