@@ -173,6 +173,7 @@ void MLPlanner::set_up_params()
     this->declare_parameter<double>("traffic_light_group_msg_timeout_seconds", 0.2);
   params_.batch_size = this->declare_parameter<int>("batch_size", 1);
   params_.noise_scale_list = this->declare_parameter<std::vector<double>>("noise_scale", {1.0});
+  params_.line_string_max_step_m = this->declare_parameter<double>("line_string_max_step_m", 5.0);
 
   // trajectory optimization params
   auto & opt = params_.trajectory_optimization;
@@ -273,9 +274,6 @@ void MLPlanner::set_up_params()
   stop_fixing.min_deceleration_duration_sec =
     this->declare_parameter<double>("stop_point_fixing.min_deceleration_duration_sec", 1.0);
 
-  params_.turn_indicator_hold_duration_sec =
-    this->declare_parameter<double>("turn_indicator_hold_duration_sec", 0.0);
-
   // planning factor params
   planning_factor_params_.enable_stop =
     this->declare_parameter<bool>("planning_factor.enable_stop", false);
@@ -351,6 +349,7 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
     new_params.traffic_light_group_msg_timeout_seconds);
   update_param<int>(parameters, "batch_size", new_params.batch_size);
   update_param<std::vector<double>>(parameters, "noise_scale", new_params.noise_scale_list);
+  update_param<double>(parameters, "line_string_max_step_m", new_params.line_string_max_step_m);
 
   auto & opt = new_params.trajectory_optimization;
   update_param<bool>(parameters, "trajectory_optimization.enable", opt.enable);
@@ -441,9 +440,6 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
     parameters, "stop_point_fixing.min_deceleration_duration_sec",
     stop_fixing.min_deceleration_duration_sec);
 
-  update_param<double>(
-    parameters, "turn_indicator_hold_duration_sec", new_params.turn_indicator_hold_duration_sec);
-
   update_param<bool>(
     parameters, "planning_factor.enable_stop", new_planning_factor_params.enable_stop);
   update_param<bool>(
@@ -505,6 +501,9 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
   }
   if (new_params.traffic_light_group_msg_timeout_seconds < 0.0) {
     return failure("traffic_light_group_msg_timeout_seconds must be non-negative");
+  }
+  if (new_params.line_string_max_step_m <= 0.0) {
+    return failure("line_string_max_step_m must be greater than zero");
   }
 #ifndef AUTOWARE_ML_PLANNER_USE_ACADOS
   if (opt.enable) {
@@ -570,9 +569,6 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
   if (stop_fixing.velocity_threshold_mps < 0.0 || stop_fixing.min_deceleration_duration_sec < 0.0) {
     return failure("stop point fixing thresholds must be non-negative");
   }
-  if (new_params.turn_indicator_hold_duration_sec < 0.0) {
-    return failure("turn_indicator_hold_duration_sec must be non-negative");
-  }
 
   const bool reload_model = new_params.base_model_directory != params_.base_model_directory ||
                             new_params.onnx_model_filename != params_.onnx_model_filename ||
@@ -582,6 +578,7 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
                             new_params.trt_precision != params_.trt_precision ||
                             new_params.use_cuda_graph != params_.use_cuda_graph;
   const bool recreate_timer = new_params.planning_frequency_hz != params_.planning_frequency_hz;
+  const bool rebuild_map = new_params.line_string_max_step_m != params_.line_string_max_step_m;
   const MLPlannerParams old_params = params_;
   const MLPlannerPlanningFactorParams old_planning_factor_params = planning_factor_params_;
   const MLPlannerDebugParams old_debug_params = debug_params_;
@@ -595,6 +592,9 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
     remap_unsupported_objects_to_pedestrian_ = new_remap_unsupported_objects_to_pedestrian;
     if (reload_model) {
       load_model();
+    }
+    if (rebuild_map && lanelet_map_ptr_) {
+      core_->set_map(lanelet_map_ptr_);
     }
     if (recreate_timer) {
       timer_ = rclcpp::create_timer(
@@ -611,6 +611,9 @@ SetParametersResult MLPlanner::on_parameter(const std::vector<rclcpp::Parameter>
       remap_unsupported_objects_to_pedestrian_ = old_remap_unsupported_objects_to_pedestrian;
       if (reload_model) {
         load_model();
+      }
+      if (rebuild_map && lanelet_map_ptr_) {
+        core_->set_map(lanelet_map_ptr_);
       }
     } catch (const std::exception & rollback_error) {
       RCLCPP_ERROR_STREAM(
@@ -638,11 +641,10 @@ void MLPlanner::publish_debug_markers(
 {
   if (debug_params_.publish_debug_route) {
     auto lifetime = rclcpp::Duration::from_seconds(0.2);
-    // All waypoints of one batch entry as one polyline
-    auto route_markers = utils::create_map_polyline_marker(
-      ego_to_map_transform, input_data_map.at("route_waypoints"),
-      {1, 1, NUM_ROUTE_WAYPOINTS, ROUTE_WAYPOINTS_SHAPE[2]}, timestamp, lifetime,
-      {0.8f, 0.8f, 0.8f, 0.8f}, "route_waypoints", "map");
+    auto route_markers = utils::create_lane_marker(
+      ego_to_map_transform, input_data_map.at("route_lanes"),
+      std::vector<int64_t>(ROUTE_LANES_SHAPE.begin(), ROUTE_LANES_SHAPE.end()), timestamp, lifetime,
+      {0.8, 0.8, 0.8, 0.8}, "map");
     pub_route_marker_->publish(route_markers);
   }
 
@@ -777,7 +779,7 @@ void MLPlanner::on_timer()
   diagnostics_inference_->add_key_value(
     "valid_lane_count", core_->count_valid_elements(input_data_map, "lanes"));
   diagnostics_inference_->add_key_value(
-    "valid_route_count", core_->count_valid_elements(input_data_map, "route_waypoints"));
+    "valid_route_count", core_->count_valid_elements(input_data_map, "route_lanes"));
   diagnostics_inference_->add_key_value(
     "valid_intersection_area_count",
     core_->count_valid_elements(input_data_map, "intersection_area"));

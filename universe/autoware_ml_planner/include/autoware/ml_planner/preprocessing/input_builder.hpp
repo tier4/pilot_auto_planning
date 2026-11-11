@@ -112,7 +112,8 @@ using InputBuilderResult = tl::expected<InputBuilderOutput, std::string>;
  * map; share it across all frames that use the same map.
  */
 std::unique_ptr<LaneSegmentContext> build_map_context(
-  const std::shared_ptr<const lanelet::LaneletMap> & lanelet_map_ptr);
+  const std::shared_ptr<const lanelet::LaneletMap> & lanelet_map_ptr,
+  double line_string_max_step_m);
 
 /**
  * @brief Build the model input tensors for one frame (stage 2, pure function).

@@ -175,11 +175,8 @@ TEST_F(LaneletEdgeCaseTest, ConvertLaneletManyInterpolationPoints)
   // Request extremely high number of interpolation points
   auto segments = convert_to_internal_lanelet_map(lanelet_map_ptr_);
 
-  // A 1000 m lanelet is split into LANE_SEGMENT_MAX_LENGTH_M (40 m) pieces.
-  ASSERT_EQ(segments.lane_segments.size(), 25);
-  for (const auto & segment : segments.lane_segments) {
-    EXPECT_EQ(segment.centerline.size(), POINTS_PER_SEGMENT);
-  }
+  ASSERT_EQ(segments.lane_segments.size(), 1);
+  EXPECT_EQ(segments.lane_segments[0].centerline.size(), POINTS_PER_SEGMENT);
 }
 
 // Test edge case: Lanelet with intersection attribute edge cases

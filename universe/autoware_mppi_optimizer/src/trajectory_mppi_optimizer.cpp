@@ -338,14 +338,14 @@ float input_activation_margin(
   return static_cast<float>(margin);
 }
 
-InputCollisionResult check_input_collision_triggers(
+bool is_input_collision_triggered(
   const Trajectory & input, const TrackedObjects & static_objects,
   const std::vector<Segment> & road_borders, const std::vector<VegetationPoint> & vegetation_points,
   const std::string & map_frame, const FirstOrderDubinsMppiVehicleParams & vehicle,
   const trajectory_mppi_optimizer::Params & params)
 {
   if (!params.trigger_on_road_border_collision && !params.trigger_on_static_object_collision) {
-    return {};
+    return false;
   }
   if (
     (params.trigger_on_road_border_collision && params.ignore_road_borders) ||
@@ -375,7 +375,7 @@ InputCollisionResult check_input_collision_triggers(
     input_activation_margin(
       params.vegetation_collision_margin, params.vegetation_safe_margin,
       params.use_soft_margins_for_input_collision));
-  return collision;
+  return collision.triggered();
 }
 
 /** @brief Planar distance [m] from ego odometry to the first DP reference point. */
@@ -535,7 +535,6 @@ ProcessingResult TrajectoryMppiOptimizer::process(
       map_velocity_limit_overrides_ = std::move(map_overrides);
     } catch (const std::exception & error) {
       constexpr auto level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
-      deactivate_conditional_mppi("invalid parameter update");
       publish_enabled(false);
       publish_status_diagnostic(level, error.what(), rclcpp::Time{data.candidate_header.stamp});
       RCLCPP_ERROR(get_node_ptr()->get_logger(), "%s", error.what());
@@ -548,6 +547,7 @@ ProcessingResult TrajectoryMppiOptimizer::process(
   pending_debug_.reset();
   pending_markers_.markers.clear();
   debug_pending_ = false;
+  input_collision_activation_source_ = InputCollisionActivationSource::none;
 
   if (!params_.enabled) {
     constexpr auto level = diagnostic_msgs::msg::DiagnosticStatus::STALE;
@@ -565,8 +565,6 @@ ProcessingResult TrajectoryMppiOptimizer::process(
     update_route_context(data);
     prepare_scene_parameters();
     ensure_optimizer();
-    const bool was_conditionally_active =
-      input_collision_activation_source_ != InputCollisionActivationSource::none;
 
     if (
       params_.optimize_only_on_input_collision && !params_.trigger_on_road_border_collision &&
@@ -702,16 +700,13 @@ ProcessingResult TrajectoryMppiOptimizer::process(
             params_.road_border_collision_margin, params_.road_border_safe_margin,
             params_.use_soft_margins_for_input_collision));
     }
-    // Exclude borders on bridges and underpasses before both the collision gate and MPPI use them.
-    const auto road_borders = extended_route_handler_->get_road_borders_around_trajectory(
-      input, boundary_query_margin, params_.road_border_max_height_difference_m);
+    const auto road_borders =
+      extended_route_handler_->get_road_borders_around_trajectory(input, boundary_query_margin);
     const auto mppi_road_borders = to_mppi_segments(road_borders);
 
     const bool reference_eligible =
       detail::isOptimizationRequired(input, params_.min_optimization_length);
-    if (!reference_eligible) {
-      deactivate_conditional_mppi("input trajectory no longer requires optimization");
-    } else if (!params_.optimize_only_on_input_collision) {
+    if (!reference_eligible || !params_.optimize_only_on_input_collision) {
       input_collision_activation_hold_.reset();
     }
     if (params_.optimize_only_on_input_collision && reference_eligible) {
@@ -720,30 +715,15 @@ ProcessingResult TrajectoryMppiOptimizer::process(
         return skip_optimization(
           level, "MPPI input trajectory has fewer than 2 points", input.header);
       }
-      const auto collision = check_input_collision_triggers(
+      const bool collision_triggered = is_input_collision_triggered(
         input, avoidance_targets, mppi_road_borders, vegetation_points,
         data.lanelet_map_bin->header.frame_id, *vehicle_params_, params_);
-      const auto activation_source = input_collision_activation_hold_.update(
-        collision.triggered(), get_node_ptr()->now().seconds(),
+      input_collision_activation_source_ = input_collision_activation_hold_.update(
+        collision_triggered, get_node_ptr()->now().seconds(),
         params_.min_input_collision_activation_duration_s);
-      if (activation_source == InputCollisionActivationSource::none) {
-        deactivate_conditional_mppi("no enabled input collision or active hold remains");
+      if (input_collision_activation_source_ == InputCollisionActivationSource::none) {
         constexpr auto level = diagnostic_msgs::msg::DiagnosticStatus::OK;
         return skip_optimization(level, "MPPI skipped: no enabled input collision", input.header);
-      }
-      input_collision_activation_source_ = activation_source;
-      if (!was_conditionally_active && collision.triggered()) {
-        std::string reasons;
-        const auto append_reason = [&reasons](const char * reason) {
-          if (!reasons.empty()) reasons += ", ";
-          reasons += reason;
-        };
-        if (collision.road_border) append_reason("road border");
-        if (collision.static_object) append_reason("stationary avoidance target");
-        if (collision.vegetation) append_reason("vegetation");
-        RCLCPP_WARN(
-          get_node_ptr()->get_logger(), "MPPI activated by input collision with %s",
-          reasons.c_str());
       }
     }
 
@@ -918,7 +898,8 @@ ProcessingResult TrajectoryMppiOptimizer::process(
                                                                     : ProcessingResult::Unchanged;
   } catch (const std::exception & error) {
     if (optimizer_) optimizer_->invalidateNominalWarmStart();
-    deactivate_conditional_mppi(std::string{"processing error: "} + error.what());
+    input_collision_activation_hold_.reset();
+    input_collision_activation_source_ = InputCollisionActivationSource::none;
     constexpr auto level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
     publish_enabled(false);
     clear_markers(data.candidate_header);
@@ -931,21 +912,13 @@ ProcessingResult TrajectoryMppiOptimizer::process(
   }
 }
 
-void TrajectoryMppiOptimizer::deactivate_conditional_mppi(const std::string & reason)
-{
-  if (input_collision_activation_source_ != InputCollisionActivationSource::none) {
-    RCLCPP_WARN(get_node_ptr()->get_logger(), "MPPI deactivated: %s", reason.c_str());
-  }
-  input_collision_activation_hold_.reset();
-  input_collision_activation_source_ = InputCollisionActivationSource::none;
-}
-
 void TrajectoryMppiOptimizer::reset_optimizer()
 {
   optimizer_.reset();
   cost_params_.reset();
   vehicle_params_.reset();
-  deactivate_conditional_mppi("optimizer reset after a configuration, route, or map change");
+  input_collision_activation_hold_.reset();
+  input_collision_activation_source_ = InputCollisionActivationSource::none;
   object_selector_ = autoware::avoidance_target_detector::TrackedObjectSelector{};
 }
 
@@ -953,7 +926,8 @@ ProcessingResult TrajectoryMppiOptimizer::skip_optimization(
   const std::uint8_t level, const std::string & message, const std_msgs::msg::Header & header)
 {
   if (optimizer_) optimizer_->invalidateNominalWarmStart();
-  deactivate_conditional_mppi(message);
+  input_collision_activation_hold_.reset();
+  input_collision_activation_source_ = InputCollisionActivationSource::none;
   publish_enabled(false);
   clear_markers(header);
   publish_status_diagnostic(level, message, rclcpp::Time{header.stamp});
