@@ -35,9 +35,28 @@
 
 #include <cstddef>
 #include <memory>
+#include <type_traits>
 
 namespace autoware::trajectory_modifier
 {
+
+/// ExtendedRouteCache takes a std::shared_ptr. With ENABLE_AGNOCAST=1 the map arrives as an
+/// agnocast_wrapper::message_ptr, so keep a copy of it alive inside an aliasing std::shared_ptr.
+/// The pointee address is unchanged, so the cache's map identity check still works.
+template <typename PtrT>
+autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr to_std_shared_ptr(const PtrT & ptr)
+{
+  using StdPtr = autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr;
+  if constexpr (std::is_convertible_v<PtrT, StdPtr>) {
+    return ptr;
+  } else {
+    if (!ptr) {
+      return nullptr;
+    }
+    auto holder = std::make_shared<const PtrT>(ptr);
+    return StdPtr{holder, holder->get()};
+  }
+}
 
 /// @brief Runtime inputs and mutable state shared while processing one candidate trajectory.
 ///
