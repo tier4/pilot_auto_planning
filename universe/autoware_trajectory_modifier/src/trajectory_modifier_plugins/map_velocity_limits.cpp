@@ -20,6 +20,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace autoware::trajectory_modifier::plugin
@@ -27,6 +28,24 @@ namespace autoware::trajectory_modifier::plugin
 
 namespace
 {
+/// ExtendedRouteCache takes a std::shared_ptr. With ENABLE_AGNOCAST=1 the map arrives as an
+/// agnocast_wrapper::message_ptr, so keep a copy of it alive inside an aliasing std::shared_ptr.
+/// The pointee address is unchanged, so the cache's map identity check still works.
+template <typename PtrT>
+autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr to_std_shared_ptr(const PtrT & ptr)
+{
+  using StdPtr = autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr;
+  if constexpr (std::is_convertible_v<PtrT, StdPtr>) {
+    return ptr;
+  } else {
+    if (!ptr) {
+      return nullptr;
+    }
+    auto holder = std::make_shared<const PtrT>(ptr);
+    return StdPtr{holder, holder->get()};
+  }
+}
+
 autoware::avoidance_target_detector::ExtendedRouteHandler::VelocityLimitOverrides
 make_velocity_limit_overrides(const TrajectoryModifierParams & params)
 {
@@ -92,7 +111,7 @@ bool MapVelocityLimits::is_trajectory_modification_required(
     return false;
   }
   extended_route_handler_ = context_->extended_route_cache.get_or_create(
-    input.lanelet_map, input.lanelet_map_bin, *input.route, false);
+    input.lanelet_map, to_std_shared_ptr(input.lanelet_map_bin), *input.route, false);
   return true;
 }
 
