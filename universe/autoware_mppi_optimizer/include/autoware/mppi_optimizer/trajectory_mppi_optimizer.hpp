@@ -23,6 +23,7 @@
 
 #include <autoware/avoidance_target_detector/boundary.hpp>
 #include <autoware/avoidance_target_detector/object_filtering.hpp>
+#include <autoware/agnocast_wrapper/macros.hpp>
 #include <autoware/agnocast_wrapper/node.hpp>
 #include <autoware/agnocast_wrapper/polling_subscriber.hpp>
 #include <autoware/trajectory_modifier/trajectory_modifier_plugin_base.hpp>
