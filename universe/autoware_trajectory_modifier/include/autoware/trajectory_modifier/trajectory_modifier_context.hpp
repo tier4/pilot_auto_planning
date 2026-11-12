@@ -19,6 +19,7 @@
 #include <autoware/agnocast_wrapper/node.hpp>
 #include <autoware/agnocast_wrapper/polling_subscriber.hpp>
 #include <autoware/agnocast_wrapper/tf2.hpp>
+#include <autoware/avoidance_target_detector/boundary.hpp>
 #include <autoware_utils_rclcpp/polling_subscriber.hpp>
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -130,16 +131,16 @@ struct TrajectoryModifierContext
       node, "~/input/external_velocity_limit_mps", rclcpp::QoS{1}.transient_local())},
     external_limit_clear_sub{make_polling_subscriber<
       ExternalVelocityLimitState::ClearCommand, autoware_utils_rclcpp::polling_policy::All>(
-      node, "~/input/velocity_limit_clear_command", rclcpp::QoS{10}.transient_local())}
+      node, "~/input/velocity_limit_clear_command", rclcpp::QoS{10}.transient_local())},
+    scenario_max_velocity_sub{make_polling_subscriber<
+      ExternalVelocityLimitState::Limit, autoware_utils_rclcpp::polling_policy::Newest>(
+      node, "~/input/scenario_max_velocity_mps", rclcpp::QoS{1})}
   {
   }
 
   /// Shared map and route preparation for the map-limit plugin and MPPI.
   autoware::avoidance_target_detector::ExtendedRouteCache extended_route_cache;
 
-  /// @brief Drain the external velocity limit and clear command subscriptions into the shared
-  /// state. The agnocast-compatible polling subscribers carry no DDS source timestamp, so when a
-  /// limit and a clear command are pending together the clear command takes precedence.
   void refresh_external_velocity_limit()
   {
     if (const auto limit = external_limit_sub->take_data()) {
@@ -151,12 +152,29 @@ struct TrajectoryModifierContext
     }
   }
 
+  /// @brief Keep the latest finite, non-negative `/planning/scenario_planning/max_velocity` sample.
+  void refresh_scenario_max_velocity()
+  {
+    const auto msg = scenario_max_velocity_sub->take_data();
+    if (!msg || !std::isfinite(msg->max_velocity) || msg->max_velocity < 0.0F) {
+      return;
+    }
+    scenario_max_velocity_ = msg;
+  }
+
+  [[nodiscard]] const ExternalVelocityLimitState::Limit::ConstSharedPtr & scenario_max_velocity()
+    const
+  {
+    return scenario_max_velocity_;
+  }
+
   autoware::vehicle_info_utils::VehicleInfo vehicle_info;
   autoware::agnocast_wrapper::Buffer tf_buffer;
   autoware::agnocast_wrapper::TransformListener tf_listener;
   ExternalVelocityLimitState external_velocity_limit;
   LimitSubscriber::SharedPtr external_limit_sub;
   ClearSubscriber::SharedPtr external_limit_clear_sub;
+  LimitSubscriber::SharedPtr scenario_max_velocity_sub;
 
 private:
   /// @brief Create a polling subscriber on either an agnocast_wrapper::Node (or a node derived
@@ -176,6 +194,8 @@ private:
         static_cast<rclcpp::Node *>(node), topic_name, qos);
     }
   }
+
+  ExternalVelocityLimitState::Limit::ConstSharedPtr scenario_max_velocity_{nullptr};
 };
 
 }  // namespace autoware::trajectory_modifier
