@@ -472,8 +472,6 @@ PlannerOutput MLPlannerCore::create_planner_output(
 
     if (i == 0) {
       // Publish the first trajectory's command on the standalone turn indicator topic.
-      turn_indicators_command.command = turn_indicator_hold_.apply(
-        turn_indicators_command.command, timestamp, params_.turn_indicator_hold_duration_sec);
       output.turn_indicators_command = turn_indicators_command;
     }
 
@@ -535,10 +533,10 @@ int64_t MLPlannerCore::count_valid_elements(
   if (data_key == "lanes") {
     return postprocess::count_valid_elements(
       input_data_map.at("lanes"), LANES_SHAPE[1], LANES_SHAPE[2], LANES_SHAPE[3], batch_idx);
-  } else if (data_key == "route_waypoints") {
+  } else if (data_key == "route_lanes") {
     return postprocess::count_valid_elements(
-      input_data_map.at("route_waypoints"), ROUTE_WAYPOINTS_SHAPE[1], 1, ROUTE_WAYPOINTS_SHAPE[2],
-      batch_idx);
+      input_data_map.at("route_lanes"), ROUTE_LANES_SHAPE[1], ROUTE_LANES_SHAPE[2],
+      ROUTE_LANES_SHAPE[3], batch_idx);
   } else if (data_key == "intersection_area") {
     return postprocess::count_valid_elements(
       input_data_map.at("intersection_area"), INTERSECTION_AREA_SHAPE[1],
