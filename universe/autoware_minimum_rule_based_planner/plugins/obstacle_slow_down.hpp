@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef PLANNING__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__OBSTACLE_SLOW_DOWN_HPP_
-#define PLANNING__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__OBSTACLE_SLOW_DOWN_HPP_
+#ifndef UNIVERSE__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__OBSTACLE_SLOW_DOWN_HPP_
+#define UNIVERSE__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__OBSTACLE_SLOW_DOWN_HPP_
 
 #include "plugin_interface.hpp"
 #include "utils/obstacle_slow_down_utils.hpp"
@@ -52,4 +52,4 @@ private:
 
 }  // namespace autoware::minimum_rule_based_planner::plugin
 
-#endif  // PLANNING__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__OBSTACLE_SLOW_DOWN_HPP_
+#endif  // UNIVERSE__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__OBSTACLE_SLOW_DOWN_HPP_
