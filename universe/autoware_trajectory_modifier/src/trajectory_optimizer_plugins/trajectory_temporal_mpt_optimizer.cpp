@@ -150,6 +150,7 @@ void TrajectoryTemporalMPTOptimizer::update_params(const TrajectoryModifierParam
   const bool warm_start_was_enabled = mpt_params_.use_previous_solution_warm_start;
   enabled_ = params.use_temporal_mpt_optimizer;
   set_mpt_params(params.trajectory_temporal_mpt_optimizer);
+  // cppcheck-suppress oppositeExpression ; set_mpt_params() above updates mpt_params_
   if (warm_start_was_enabled && !mpt_params_.use_previous_solution_warm_start) {
     have_prev_solution_ = false;
   }

@@ -82,6 +82,7 @@ TrajectoryModifier::TrajectoryModifier(const rclcpp::NodeOptions & options)
 }
 
 void TrajectoryModifier::on_map(
+  // cppcheck-suppress unknownMacro ; defined by the agnocast wrapper headers
   AUTOWARE_MESSAGE_CONST_SHARED_PTR(autoware_map_msgs::msg::LaneletMapBin) msg)
 {
   autoware_utils_debug::ScopedTimeTrack st(__func__, *time_keeper_);

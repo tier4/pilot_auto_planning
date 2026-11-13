@@ -133,7 +133,7 @@ bool insert_stop_point(
 
   auto stop_idx = idx;
   if (std::abs(distance - stop_point_arc_length) < overlap_threshold) {
-    stop_idx = idx;
+    // the stop point is already on idx
   } else if (std::abs(distance + seg_length - stop_point_arc_length) < overlap_threshold) {
     stop_idx = idx + 1;
   } else {
