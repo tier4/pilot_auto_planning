@@ -297,7 +297,7 @@ void ObstacleStop::update_collision_points_buffer(
   collision_points_buffer.erase(
     std::remove_if(
       collision_points_buffer.begin(), collision_points_buffer.end(),
-      [&](CollisionPoint & cp) {
+      [&](const CollisionPoint & cp) {
         if (cp.is_active) return (now - cp.last_seen).seconds() > params_.off_time_buffer;
         return !collision_point;
       }),
