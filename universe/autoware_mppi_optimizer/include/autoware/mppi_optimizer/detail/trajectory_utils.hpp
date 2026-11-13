@@ -163,8 +163,7 @@ void setInitialEngageVelocity(
  * An inactive profile is an exact no-op.
  */
 void applyActiveVelocityLimitProfile(
-  Trajectory & trajectory, const ActiveVelocityLimitProfile & profile,
-  std::size_t begin_index = 0);
+  Trajectory & trajectory, const ActiveVelocityLimitProfile & profile, std::size_t begin_index = 0);
 
 /**
  * Build a cold nominal from a spatially smoothed curvature fit. Horizon samples advance by the

@@ -493,18 +493,17 @@ void TrajectoryMppiOptimizer::on_initialize(
   mpc_predicted_trajectory_sub_ =
     make_polling_subscriber<Trajectory>("~/input/mpc_predicted_trajectory", rclcpp::QoS{1});
 
-  reference_trajectory_pub_ =
-    make_publisher<Trajectory>("~/debug/mppi/reference_trajectory", 1);
+  reference_trajectory_pub_ = make_publisher<Trajectory>("~/debug/mppi/reference_trajectory", 1);
   nominal_control_trajectory_pub_ =
     make_publisher<Trajectory>("~/debug/mppi/nominal_control_trajectory", 1);
   optimized_trajectory_pub_ = make_publisher<Trajectory>("~/debug/mppi/optimized_trajectory", 1);
   nominal_trajectory_pub_ = make_publisher<Trajectory>("~/debug/mppi/nominal_trajectory", 1);
   velocity_limit_trajectory_pub_ =
-      make_publisher<Trajectory>("~/debug/mppi/velocity_limit_trajectory", 1);
+    make_publisher<Trajectory>("~/debug/mppi/velocity_limit_trajectory", 1);
   markers_pub_ = make_publisher<MarkerArray>("~/debug/mppi/markers", 1);
   rollouts_pub_ = make_publisher<MarkerArray>("~/debug/mppi/rollouts", 1);
-  enabled_pub_ = make_publisher<std_msgs::msg::Bool>(
-    "~/debug/mppi/enabled", rclcpp::QoS{1}.transient_local());
+  enabled_pub_ =
+    make_publisher<std_msgs::msg::Bool>("~/debug/mppi/enabled", rclcpp::QoS{1}.transient_local());
   publish_enabled(false);
 }
 
@@ -534,8 +533,8 @@ ProcessingResult TrajectoryMppiOptimizer::process(
       constexpr auto level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
       publish_enabled(false);
       publish_status_diagnostic(level, error.what(), rclcpp::Time{data.candidate_header.stamp});
-        RCLCPP_ERROR(get_logger(), "%s", error.what());
-        if (data.candidate_index == 0U) previous_mppi_trajectory_applied_ = false;
+      RCLCPP_ERROR(get_logger(), "%s", error.what());
+      if (data.candidate_index == 0U) previous_mppi_trajectory_applied_ = false;
       return ProcessingResult::Unchanged;
     }
     params_ = std::move(updated_params);
@@ -901,8 +900,7 @@ ProcessingResult TrajectoryMppiOptimizer::process(
     clear_markers(data.candidate_header);
     publish_status_diagnostic(level, error.what(), rclcpp::Time{data.candidate_header.stamp});
     RCLCPP_ERROR_THROTTLE(
-      get_logger(), *get_clock(), 1000,
-      "MPPI optimization failed: %s", error.what());
+      get_logger(), *get_clock(), 1000, "MPPI optimization failed: %s", error.what());
     previous_mppi_trajectory_applied_ = false;
     return ProcessingResult::Unchanged;
   }
@@ -990,7 +988,8 @@ void TrajectoryMppiOptimizer::prepare_scene_parameters()
   }
 
   auto cost_params = make_cost_params(params_);
-  auto vehicle_params = with_node([](auto * node) { return get_first_order_dubins_mppi_vehicle_params(*node); });
+  auto vehicle_params =
+    with_node([](auto * node) { return get_first_order_dubins_mppi_vehicle_params(*node); });
   vehicle_params.max_lateral_jerk_mps3 = static_cast<float>(params_.max_lateral_jerk_mps3);
   vehicle_params.standstill_steer_rate_lim = static_cast<float>(params_.standstill_steer_rate_lim);
   vehicle_params.restart_steer_command_rate_lim =

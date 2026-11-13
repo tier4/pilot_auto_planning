@@ -36,7 +36,7 @@ class ReportIntegrityTest(unittest.TestCase):
         self.name = "Fixture.KnownObjective"
         self.tables = {key: [] for key in report.HEADERS}
         self.tables["meta"] = [
-            dict(key=key, value=value)
+            {"key": key, "value": value}
             for key, value in {
                 "schema_version": "3",
                 "horizon": "2",
@@ -68,18 +68,23 @@ class ReportIntegrityTest(unittest.TestCase):
             )
             self.tables["steps"].append(row)
             self.tables["checks"].append(
-                dict(
-                    row=i, check="cost.track", actual=cost, expected=cost, tolerance=1e-5, passed=1
-                )
+                {
+                    "row": i,
+                    "check": "cost.track",
+                    "actual": cost,
+                    "expected": cost,
+                    "tolerance": 1e-5,
+                    "passed": 1,
+                }
             )
             for j in range(2):
                 self.tables["reference"].append(
-                    dict(row=i, kind="reference", index=j, x=j, y=0, yaw=0, v=1)
+                    {"row": i, "kind": "reference", "index": j, "x": j, "y": 0, "yaw": 0, "v": 1}
                 )
             self.tables["reference"].append(
-                dict(row=i, kind="terminal", index=0, x=1, y=0, yaw=0, v=0)
+                {"row": i, "kind": "terminal", "index": 0, "x": 1, "y": 0, "yaw": 0, "v": 0}
             )
-            self.tables["params"].append(dict(row=i, parameter="wheel_base", value=2))
+            self.tables["params"].append({"row": i, "parameter": "wheel_base", "value": 2})
 
     def write(self, omit=None):
         for key, rows in self.tables.items():
