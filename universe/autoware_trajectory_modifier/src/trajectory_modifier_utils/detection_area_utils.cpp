@@ -27,6 +27,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace autoware::trajectory_modifier::utils::detection_area

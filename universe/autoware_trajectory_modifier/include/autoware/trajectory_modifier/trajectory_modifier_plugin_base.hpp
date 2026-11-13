@@ -83,7 +83,8 @@ private:
   }
 
   template <typename PublisherT>
-  static size_t get_intra_process_subscription_count_or_zero(PublisherT &, long)
+  static size_t get_intra_process_subscription_count_or_zero(
+    PublisherT &, long)  // NOLINT(runtime/int)
   {
     return 0;
   }
