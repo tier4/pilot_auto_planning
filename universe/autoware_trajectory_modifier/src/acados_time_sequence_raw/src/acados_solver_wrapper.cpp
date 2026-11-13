@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore yref
 #include "autoware/trajectory_modifier/time_sequence_raw/acados_solver_wrapper.hpp"
 
 #include <algorithm>

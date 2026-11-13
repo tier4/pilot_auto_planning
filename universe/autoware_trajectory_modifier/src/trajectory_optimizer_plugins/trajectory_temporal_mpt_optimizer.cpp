@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore utraj xtraj yref
 #include "autoware/trajectory_modifier/trajectory_optimizer_plugins/trajectory_temporal_mpt_optimizer.hpp"
 
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>

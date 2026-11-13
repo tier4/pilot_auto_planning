@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore reclamp
 #include "autoware/trajectory_modifier/trajectory_modifier_plugins/external_velocity_limit.hpp"
 
 #include "autoware/trajectory_modifier/trajectory_modifier_utils/set_max_velocity.hpp"
