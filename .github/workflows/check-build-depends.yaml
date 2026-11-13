@@ -19,14 +19,14 @@ jobs:
             container: ros:humble
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
 
       - name: Remove exec_depend
-        uses: autowarefoundation/autoware-github-actions/remove-exec-depend@v1
+        uses: autowarefoundation/autoware-github-actions/remove-exec-depend@v1.69.2
 
       - name: Get self packages
         id: get-self-packages
-        uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
+        uses: autowarefoundation/autoware-github-actions/get-self-packages@v1.69.2
 
       - name: Prepare build_depends.repos file (main branch)
         if: ${{ github.event.pull_request.base.ref != 'humble' }}
@@ -42,7 +42,7 @@ jobs:
         shell: bash
 
       - name: Build
-        uses: autowarefoundation/autoware-github-actions/colcon-build@v1
+        uses: autowarefoundation/autoware-github-actions/colcon-build@v1.69.2
         with:
           rosdistro: ${{ matrix.rosdistro }}
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}

@@ -32,6 +32,7 @@
     "valinit",
     "oids",
     "reparenting",
-    "gpgsig"
+    "gpgsig",
+    "Dslots"
   ]
 }
