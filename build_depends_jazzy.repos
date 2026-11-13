@@ -1,0 +1,42 @@
+# Versions follow autoware.repos in tier4/pilot-auto.x2.
+repositories:
+  autoware/common:
+    type: git
+    url: https://github.com/tier4/pilot_auto_common.git
+    version: a2daddaf7514e01a857f49bb1609b28a2ef17414 # com2.2-alpha
+  autoware/autoware_cmake:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_cmake.git
+    version: 7c6d101f600e1f77dc8462ab9cc3d7be7b5d5ac2 # 1.3.0
+  autoware/autoware_utils:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_utils.git
+    version: 34fe4a0672b07ab10ca8a6b74b0bdd235a2a598f
+  autoware/autoware_lanelet2_extension:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_lanelet2_extension.git
+    version: 4a3420d8cc19906e7739618f8a1686400f79b4ac
+  autoware/tier4_autoware_msgs:
+    type: git
+    url: https://github.com/tier4/tier4_autoware_msgs.git
+    version: efa4129394ad0b83a1de6c6d90ad937d74e9e426 # 1.1.0-alpha
+  autoware/autoware_msgs:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_msgs.git
+    version: bb8e7bf5d97168663e0e7b357929e4fcdbd3a967 # 1.12.0
+  autoware/autoware_adapi_msgs:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_adapi_msgs.git
+    version: 35a7aeb97dfbbbc363c49fc032ded0c8ba172e24 # 1.9.2
+  autoware/autoware_internal_msgs:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_internal_msgs.git
+    version: 4144effa727d194554ad78d343683201bbbbc427 # 1.16.0
+  middleware/external/agnocast:
+    type: git
+    url: https://github.com/autowarefoundation/agnocast.git
+    version: 9e59aeabc71c824274e20681819f6aa11ef4db45 # 2.4.1-fixed-for-x2-v5
+  vendor/point_cloud_msg_wrapper:
+    type: git
+    url: https://gitlab.com/ApexAI/point_cloud_msg_wrapper
+    version: 3bf666051e62030d60ac89ca818e2ee08b26d1f7 # 1.0.7
