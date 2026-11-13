@@ -3,6 +3,7 @@ project(autoware_mission_planner_universe)
 
 find_package(autoware_cmake REQUIRED)
 autoware_package()
+add_compile_options(-Wno-error=deprecated-declarations)
 
 ament_auto_add_library(goal_pose_visualizer_component SHARED
   src/goal_pose_visualizer/goal_pose_visualizer.cpp

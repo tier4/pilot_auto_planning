@@ -3,6 +3,7 @@ project(autoware_behavior_velocity_roundabout_module)
 
 find_package(autoware_cmake REQUIRED)
 autoware_package()
+add_compile_options(-Wno-error=deprecated-declarations)
 pluginlib_export_plugin_description_file(autoware_behavior_velocity_planner plugins.xml)
 
 ament_auto_add_library(${PROJECT_NAME} SHARED
