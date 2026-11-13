@@ -1,7 +1,3 @@
-# This file is automatically synced from:
-# https://github.com/autowarefoundation/sync-file-templates
-# To make changes, update the source repository and follow the guidelines in its README.
-
 name: backport
 on:
   pull_request_target:
@@ -9,9 +5,17 @@ on:
       - closed
       - labeled
 
+permissions: {}
+
 jobs:
   backport:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    # The runner only reads: it cherry-picks to detect conflicts and comments on the
+    # original pull request. It creates no branch and pushes nothing, so `contents`
+    # stays at read.
+    permissions:
+      contents: read
+      pull-requests: write
     # Only react to merged PRs for security reasons.
     # See https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target.
     if: >
@@ -24,36 +28,54 @@ jobs:
         )
       )
     steps:
-      - name: Generate token
-        id: generate-token
-        uses: tibdex/github-app-token@v2
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.PRIVATE_KEY }}
-
-      - uses: tibdex/backport@v2
-        id: backport
-        with:
-          github_token: ${{ steps.generate-token.outputs.token }}
-          title_template: "<%= title %> (backport #<%= number %>)"
-
-      - name: Request review from original author
+      - name: Resolve backport target branches
+        id: targets
         env:
-          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
-          PR_JSON: ${{ steps.backport.outputs.created_pull_requests }}
-          ORIGINAL_AUTHOR: ${{ github.event.pull_request.user.login }}
+          ACTION: ${{ github.event.action }}
+          LABEL: ${{ github.event.label.name }}
         run: |
-          set -e
-          echo "Created PRs JSON: $PR_JSON"
-          echo "Original PR Author: $ORIGINAL_AUTHOR"
+          if [ "${ACTION}" = "labeled" ]; then
+            printf '%s\n' "${LABEL}"
+          else
+            jq -r '.pull_request.labels[].name' "${GITHUB_EVENT_PATH}"
+          fi | sed -n 's/^backport \([^ ]\+\)$/\1/p' | sort -u > "${RUNNER_TEMP}/bases.txt"
+          echo "count=$(wc -l < "${RUNNER_TEMP}/bases.txt")" >> "${GITHUB_OUTPUT}"
+          cat "${RUNNER_TEMP}/bases.txt"
 
-          # Use 'jq' to parse the JSON and extract all PR numbers
-          pr_numbers=($(echo "$PR_JSON" | jq -r 'to_entries | .[] | .value'))
+      - name: Checkout
+        if: steps.targets.outputs.count != '0'
+        uses: actions/checkout@v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-          # Loop through the array of PR numbers
-          for pr_num in "${pr_numbers[@]}"; do
-            if [ -n "$pr_num" ]; then
-              echo "Requesting review for PR #$pr_num from $ORIGINAL_AUTHOR..."
-              gh pr edit "$pr_num" --add-reviewer "$ORIGINAL_AUTHOR" --repo "${{ github.repository }}"
+      # The runner cherry-picks only to detect conflicts. It does not create or push
+      # the backport branch: GITHUB_TOKEN is refused when creating that remote ref.
+      # A clean cherry-pick is reported as Ubuntu commands on the original pull
+      # request. Conflicts are written to the comment file below.
+      - name: Backport
+        if: steps.targets.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          failed=0
+          while read -r base; do
+            [ -n "${base}" ] || continue
+            head="backport-${PR_NUMBER}-to-${base}"
+            echo "::group::Backporting ${MERGE_SHA} from #${PR_NUMBER} to ${base} on ${head}"
+            if ! ./.github/workflows/scripts/backport_one.py "${base}" "${head}" < /dev/null; then
+              failed=1
+              gh pr comment "${PR_NUMBER}" --repo "${REPO}" \
+                --body-file "${RUNNER_TEMP}/comment.md" < /dev/null || true
             fi
-          done
+            echo "::endgroup::"
+          done < "${RUNNER_TEMP}/bases.txt"
+          exit "${failed}"
