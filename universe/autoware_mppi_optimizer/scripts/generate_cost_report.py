@@ -117,7 +117,7 @@ class Case:
 
 
 def load_case(directory, name):
-    """A malformed case stays visible as FAIL; it never disappears from coverage."""
+    """Load a case; a malformed case stays visible as FAIL and never disappears from coverage."""
     case = Case(name)
     try:
         meta = read_table(directory / f"{name}.meta.csv", HEADERS["meta"])
