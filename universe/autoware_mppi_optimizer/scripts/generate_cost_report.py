@@ -14,6 +14,7 @@
 # limitations under the License.
 """Validate one cost-test run and write a Markdown report with standalone PNG plots."""
 
+# cspell:ignore nonfinite overspeed
 import argparse
 import csv
 from dataclasses import dataclass

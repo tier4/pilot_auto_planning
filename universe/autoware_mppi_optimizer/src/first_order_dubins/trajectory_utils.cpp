@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore pointwise unbraked
 #include "autoware/mppi_optimizer/detail/trajectory_utils.hpp"
 
 #include <mppi/dynamics/dubins/velocity_dependent_steering_rate.cuh>

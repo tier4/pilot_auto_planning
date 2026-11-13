@@ -14,6 +14,7 @@
 # limitations under the License.
 """Report integrity regressions. No CUDA, pandas, or matplotlib required."""
 
+# cspell:ignore nonfinite
 import csv
 import importlib.util
 from pathlib import Path
