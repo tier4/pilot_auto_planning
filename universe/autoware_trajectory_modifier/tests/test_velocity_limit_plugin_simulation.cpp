@@ -16,10 +16,10 @@
 // the external limit is received through its topic and the map limit is resolved from a lanelet
 // map, so parameter plumbing and the lanelet lookup are covered as well.
 
+#include "autoware/trajectory_modifier/trajectory_modifier_context.hpp"
 #include "autoware/trajectory_modifier/trajectory_modifier_plugins/external_velocity_limit.hpp"
 #include "autoware/trajectory_modifier/trajectory_modifier_plugins/map_velocity_limits.hpp"
 #include "autoware/trajectory_modifier/trajectory_optimizer_plugins/trajectory_velocity_optimizer.hpp"
-#include "autoware/trajectory_modifier/trajectory_modifier_context.hpp"
 #include "velocity_limit_simulation.hpp"
 
 #include <ament_index_cpp/get_package_share_directory.hpp>

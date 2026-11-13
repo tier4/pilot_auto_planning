@@ -15,7 +15,6 @@
 #ifndef AUTOWARE__TRAJECTORY_MODIFIER__TRAJECTORY_MODIFIER_CONTEXT_HPP_
 #define AUTOWARE__TRAJECTORY_MODIFIER__TRAJECTORY_MODIFIER_CONTEXT_HPP_
 
-#include <autoware/avoidance_target_detector/boundary.hpp>
 #include <autoware/agnocast_wrapper/node.hpp>
 #include <autoware/agnocast_wrapper/polling_subscriber.hpp>
 #include <autoware/agnocast_wrapper/tf2.hpp>

@@ -356,7 +356,8 @@ bool ObstacleStop::apply_cruise(
   // becomes 0
   const double max_acceleration =
     input.current_acceleration
-      ? std::max(0.0, std::min(cruise.max_acceleration, input.current_acceleration->accel.accel.linear.x))
+      ? std::max(
+          0.0, std::min(cruise.max_acceleration, input.current_acceleration->accel.accel.linear.x))
       : cruise.max_acceleration;
   const detail::VelocityLimitConstraints constraints{
     max_acceleration, cruise.max_deceleration, cruise.max_jerk};

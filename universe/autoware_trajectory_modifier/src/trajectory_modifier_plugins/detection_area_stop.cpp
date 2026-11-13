@@ -126,7 +126,8 @@ bool DetectionAreaStop::check_inputs(const TrajectoryModifierData & input) const
   return input.current_odometry && input.lanelet_map && input.route;
 }
 
-ProcessingResult DetectionAreaStop::process(TrajectoryPoints & points, TrajectoryModifierData & input)
+ProcessingResult DetectionAreaStop::process(
+  TrajectoryPoints & points, TrajectoryModifierData & input)
 {
   autoware_utils_debug::ScopedTimeTrack st("DetectionAreaStop::process", *get_time_keeper());
   // The framework processes candidate indices in order, starting at zero for each callback.
@@ -351,10 +352,10 @@ void DetectionAreaStop::update_physical_stop_state(const TrajectoryModifierData 
       params_.unstoppable_policy == "force_stop" && (obstacle_active || keep_hold) &&
       ((was_force_stop_required && (module.state != State::STOP || stopped)) ||
        distance >= -params_.distance_to_judge_over_stop_line);
-    const bool near_stop = distance <= params_.hold_stop_margin_distance + 1e-3 &&
-                           (distance >= -params_.distance_to_judge_over_stop_line ||
-                            params_.unstoppable_policy == "stop_after_stopline" ||
-                            module.force_stop_required);
+    const bool near_stop =
+      distance <= params_.hold_stop_margin_distance + 1e-3 &&
+      (distance >= -params_.distance_to_judge_over_stop_line ||
+       params_.unstoppable_policy == "stop_after_stopline" || module.force_stop_required);
     set_state(
       module, stopped && near_stop && (obstacle_active || keep_hold) ? State::STOP : State::GO);
   }
@@ -493,8 +494,8 @@ std::optional<DetectionAreaStop::StopDecision> DetectionAreaStop::evaluate_modul
     params_.unstoppable_policy == "stop_after_stopline" ||
     (params_.unstoppable_policy == "force_stop" && module.force_stop_required);
   if (
-    !stop_point_s_opt && continues_after_stop_line &&
-    module.physical_stop_distance && *module.physical_stop_distance < 0.0) {
+    !stop_point_s_opt && continues_after_stop_line && module.physical_stop_distance &&
+    *module.physical_stop_distance < 0.0) {
     // Once the line is behind the candidate horizon, the ego/map observation still
     // anchors the active stopping obligation; no other candidate supplies state.
     const auto candidate_ego = path.compute(*self_s).pose.position;
