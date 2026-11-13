@@ -88,6 +88,14 @@ jobs:
       - name: Show machine specs
         run: lscpu && free -h
 
+      - name: Ignore packages that require CUDA
+        run: |
+          touch universe/autoware_diffusion_planner/COLCON_IGNORE
+          touch universe/autoware_ml_planner/COLCON_IGNORE
+          touch universe/autoware_mppi_optimizer/COLCON_IGNORE
+          sed -i '/<depend>autoware_mppi_optimizer<\/depend>/d' universe/autoware_safety_planner/package.xml
+        shell: bash
+
       - name: Remove exec_depend
         uses: autowarefoundation/autoware-github-actions/remove-exec-depend@v1.69.2
 
