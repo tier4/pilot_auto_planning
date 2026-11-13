@@ -15,8 +15,8 @@
 #ifndef AUTOWARE__TRAJECTORY_MODIFIER__TRAJECTORY_MODIFIER_PLUGINS__MAP_VELOCITY_LIMITS_HPP_
 #define AUTOWARE__TRAJECTORY_MODIFIER__TRAJECTORY_MODIFIER_PLUGINS__MAP_VELOCITY_LIMITS_HPP_
 
-#include "autoware/trajectory_modifier/trajectory_modifier_plugins/velocity_limits.hpp"
 #include "autoware/trajectory_modifier/trajectory_modifier_plugin_base.hpp"
+#include "autoware/trajectory_modifier/trajectory_modifier_plugins/velocity_limits.hpp"
 
 #include <autoware/avoidance_target_detector/boundary.hpp>
 #include <rclcpp/rclcpp.hpp>
