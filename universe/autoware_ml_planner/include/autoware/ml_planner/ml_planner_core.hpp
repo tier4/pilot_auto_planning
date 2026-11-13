@@ -292,7 +292,7 @@ private:
   std::vector<preprocess::SelectedAgent> selected_agents_;
 
   // Raw message history buffers, bounded to the model input time window.
-  // All derived history data is computed statelessly from these buffers.
+  // All derived history data is computed from these buffers without extra state.
   utils::TimedBuffer<Odometry> ego_history_{
     HISTORY_WINDOW_S, [](const Odometry & msg) { return rclcpp::Time(msg.header.stamp); }};
   utils::TimedBuffer<SteeringReport> steering_history_{
