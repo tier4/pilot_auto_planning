@@ -183,7 +183,8 @@ private:
   std::unordered_set<std::string> active_filter_names_;
 
   // Publishers
-  std::shared_ptr<autoware_utils_debug::BasicDebugPublisher<autoware::agnocast_wrapper::Node>> pub_debug_;
+  std::shared_ptr<autoware_utils_debug::BasicDebugPublisher<autoware::agnocast_wrapper::Node>>
+    pub_debug_;
   std::unique_ptr<
     autoware::planning_factor_interface::PlanningFactorInterfaceT<autoware::agnocast_wrapper::Node>>
     planning_factor_interface_;

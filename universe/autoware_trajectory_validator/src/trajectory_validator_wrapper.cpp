@@ -79,8 +79,8 @@ TrajectoryValidatorWrapper::TrajectoryValidatorWrapper(
   publishers();
 
   planning_factor_interface_ =
-    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterfaceT<autoware::agnocast_wrapper::Node>>(
-      &node, "trajectory_validator");
+    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterfaceT<
+      autoware::agnocast_wrapper::Node>>(&node, "trajectory_validator");
   validator_ptr_ = std::make_unique<TrajectoryValidator>(plugins_);
   validator_diagnostic_ptr_ = init_diagnostic(node_parameters_interface);
 }
