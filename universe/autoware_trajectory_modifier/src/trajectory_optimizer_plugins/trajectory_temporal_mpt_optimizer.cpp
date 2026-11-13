@@ -119,8 +119,9 @@ void TrajectoryTemporalMPTOptimizer::on_initialize(const TrajectoryModifierParam
   // Bicycle lf/lr from vehicle_info: CG at geometric box center (same as MPPI
   // ego_axle_to_box_center).
   {
-    const auto vehicle_info = with_node(
-      [](auto * node) { return autoware::vehicle_info_utils::VehicleInfoUtils(*node).getVehicleInfo(); });
+    const auto vehicle_info = with_node([](auto * node) {
+      return autoware::vehicle_info_utils::VehicleInfoUtils(*node).getVehicleInfo();
+    });
     const double wb = std::max(1.0e-3, vehicle_info.wheel_base_m);
     double lr = 0.5 * vehicle_info.vehicle_length_m - vehicle_info.rear_overhang_m;
     lr = std::clamp(lr, 1.0e-3, wb - 1.0e-3);
@@ -286,8 +287,8 @@ ProcessingResult TrajectoryTemporalMPTOptimizer::process(
 
     if (mpt_params_.enable_debug_info) {
       RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 2000,
-        "Temporal MPT acados solve failed with status %d", solution.status);
+        get_logger(), *get_clock(), 2000, "Temporal MPT acados solve failed with status %d",
+        solution.status);
 
       rclcpp::Logger logger = get_logger();
       RCLCPP_INFO(logger, "Temporal MPT optimize: plugin=%s", get_name().c_str());
@@ -330,8 +331,8 @@ ProcessingResult TrajectoryTemporalMPTOptimizer::process(
   } else {
     if (mpt_params_.enable_debug_info) {
       RCLCPP_INFO_THROTTLE(
-        get_logger(), *get_clock(), 2000,
-        "Temporal MPT acados solve succeeded with status %d", solution.status);
+        get_logger(), *get_clock(), 2000, "Temporal MPT acados solve succeeded with status %d",
+        solution.status);
     }
     if (mpt_params_.use_previous_solution_warm_start) {
       prev_u_ = solution.utraj;

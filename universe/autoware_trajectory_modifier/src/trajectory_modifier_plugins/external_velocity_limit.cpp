@@ -132,8 +132,7 @@ ProcessingResult ExternalVelocityLimit::process(
     const bool changed =
       before.size() != traj_points.size() ||
       !std::equal(
-        before.begin(), before.end(), traj_points.begin(),
-        [](const auto & lhs, const auto & rhs) {
+        before.begin(), before.end(), traj_points.begin(), [](const auto & lhs, const auto & rhs) {
           return lhs.longitudinal_velocity_mps == rhs.longitudinal_velocity_mps &&
                  lhs.acceleration_mps2 == rhs.acceleration_mps2;
         });

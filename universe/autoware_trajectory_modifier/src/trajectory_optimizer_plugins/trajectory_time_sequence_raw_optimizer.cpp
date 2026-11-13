@@ -222,12 +222,11 @@ void TrajectoryTimeSequenceRawOptimizer::ensure_ego_subscriptions()
     odom_sub_ = node->template create_subscription<nav_msgs::msg::Odometry>(
       "~/input/odometry", qos,
       [this](const nav_msgs::msg::Odometry & msg) { ego_buffer_.push_odometry(msg); });
-    accel_sub_ =
-      node->template create_subscription<geometry_msgs::msg::AccelWithCovarianceStamped>(
-        "~/input/acceleration", qos,
-        [this](const geometry_msgs::msg::AccelWithCovarianceStamped & msg) {
-          ego_buffer_.push_acceleration(msg);
-        });
+    accel_sub_ = node->template create_subscription<geometry_msgs::msg::AccelWithCovarianceStamped>(
+      "~/input/acceleration", qos,
+      [this](const geometry_msgs::msg::AccelWithCovarianceStamped & msg) {
+        ego_buffer_.push_acceleration(msg);
+      });
     steer_sub_ = node->template create_subscription<autoware_vehicle_msgs::msg::SteeringReport>(
       "~/input/steering_status", qos,
       [this](const autoware_vehicle_msgs::msg::SteeringReport & msg) {

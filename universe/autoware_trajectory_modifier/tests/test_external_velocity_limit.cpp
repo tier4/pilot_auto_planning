@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "autoware/trajectory_modifier/trajectory_modifier_context.hpp"
 #include "autoware/trajectory_modifier/trajectory_modifier_plugins/external_velocity_limit.hpp"
 #include "autoware/trajectory_modifier/trajectory_modifier_plugins/velocity_limits.hpp"
-#include "autoware/trajectory_modifier/trajectory_modifier_context.hpp"
 #include "autoware/trajectory_modifier/trajectory_modifier_utils/set_max_velocity.hpp"
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
@@ -22,11 +22,10 @@
 #include <autoware_utils_debug/time_keeper.hpp>
 #include <rclcpp/duration.hpp>
 
-#include <geometry_msgs/msg/accel_with_covariance_stamped.hpp>
-#include <nav_msgs/msg/odometry.hpp>
-
 #include <autoware_internal_planning_msgs/msg/velocity_limit.hpp>
 #include <autoware_internal_planning_msgs/msg/velocity_limit_clear_command.hpp>
+#include <geometry_msgs/msg/accel_with_covariance_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
 #include <gtest/gtest.h>
 

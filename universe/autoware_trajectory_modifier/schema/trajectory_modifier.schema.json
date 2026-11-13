@@ -1924,11 +1924,7 @@
             },
             "unstoppable_policy": {
               "type": "string",
-              "enum": [
-                "go",
-                "force_stop",
-                "stop_after_stopline"
-              ],
+              "enum": ["go", "force_stop", "stop_after_stopline"],
               "default": "stop_after_stopline"
             },
             "state_clear_time": {

@@ -324,7 +324,8 @@ protected:
     // stopped exception to the braking-distance check, within the stop-line tolerance.
     const double ego_x = stop_line_x - params_.detection_area_stop.stop_margin -
                          context_->vehicle_info.max_longitudinal_offset_m + 0.2;
-    auto odometry = std::make_shared<Odometry>(*make_odometry_at(ego_x, 0.0, GetParam().velocity_x));
+    auto odometry =
+      std::make_shared<Odometry>(*make_odometry_at(ego_x, 0.0, GetParam().velocity_x));
     odometry->twist.twist.linear.y = GetParam().velocity_y;
     odometry->twist.twist.linear.z = GetParam().velocity_z;
     return odometry;
@@ -805,7 +806,8 @@ TEST_P(DetectionAreaStopStoppedVelocityTest, StoppedEgoHoldsInsteadOfTakingUnsto
   if (GetParam().is_stopped) {
     EXPECT_FLOAT_EQ(trajectory.front().longitudinal_velocity_mps, 0.0F);
     EXPECT_FLOAT_EQ(trajectory.back().longitudinal_velocity_mps, 0.0F);
-    EXPECT_NEAR(trajectory.back().pose.position.x, input.current_odometry->pose.pose.position.x, 0.1);
+    EXPECT_NEAR(
+      trajectory.back().pose.position.x, input.current_odometry->pose.pose.position.x, 0.1);
   } else {
     EXPECT_EQ(trajectory, original);
   }
@@ -838,8 +840,8 @@ TEST_P(DetectionAreaStopStoppedVelocityTest, SuppressPassJudgeKeepsObservedStopW
     EXPECT_FLOAT_EQ(trajectory.front().longitudinal_velocity_mps, 0.0F);
     EXPECT_FLOAT_EQ(trajectory.back().longitudinal_velocity_mps, 0.0F);
     EXPECT_NEAR(
-      trajectory.back().pose.position.x, input_without_obstacle.current_odometry->pose.pose.position.x,
-      0.1);
+      trajectory.back().pose.position.x,
+      input_without_obstacle.current_odometry->pose.pose.position.x, 0.1);
   } else {
     EXPECT_EQ(trajectory, original);
   }
@@ -848,12 +850,9 @@ TEST_P(DetectionAreaStopStoppedVelocityTest, SuppressPassJudgeKeepsObservedStopW
 INSTANTIATE_TEST_SUITE_P(
   StoppedSpeedThreshold, DetectionAreaStopStoppedVelocityTest,
   ::testing::Values(
-    StoppedVelocityCase{0.0, 0.0, 0.0, 0.1, true},
-    StoppedVelocityCase{0.02, 0.0, 0.0, 0.1, true},
-    StoppedVelocityCase{-0.02, 0.0, 0.0, 0.1, true},
-    StoppedVelocityCase{0.1, 0.0, 0.0, 0.1, true},
-    StoppedVelocityCase{-0.1, 0.0, 0.0, 0.1, true},
-    StoppedVelocityCase{0.11, 0.0, 0.0, 0.1, false},
+    StoppedVelocityCase{0.0, 0.0, 0.0, 0.1, true}, StoppedVelocityCase{0.02, 0.0, 0.0, 0.1, true},
+    StoppedVelocityCase{-0.02, 0.0, 0.0, 0.1, true}, StoppedVelocityCase{0.1, 0.0, 0.0, 0.1, true},
+    StoppedVelocityCase{-0.1, 0.0, 0.0, 0.1, true}, StoppedVelocityCase{0.11, 0.0, 0.0, 0.1, false},
     StoppedVelocityCase{-0.11, 0.0, 0.0, 0.1, false},
     StoppedVelocityCase{0.05, 0.05, 0.05, 0.1, true},
     StoppedVelocityCase{0.06, 0.06, 0.06, 0.1, false},
