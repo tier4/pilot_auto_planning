@@ -29,6 +29,9 @@
     "retuned",
     "runpy",
     "timesteps",
-    "valinit"
+    "valinit",
+    "oids",
+    "reparenting",
+    "gpgsig"
   ]
 }

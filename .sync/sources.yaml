@@ -1,0 +1,128 @@
+# Declarative description of every mirror this repository publishes.
+#
+# This file is the single source of truth. tools/mirror.py derives the
+# git-filter-repo invocation, the commit-message rewriting, the per-source
+# mirror branches and the combined branches from it; nothing about the mapping
+# is hard-coded in the workflow.
+#
+# Determinism contract
+# --------------------
+# Per-source mirrors are pure functions of (upstream commit, this file):
+#
+#   git-filter-repo rewrites each upstream history. Same input plus same
+#   arguments always yields the same commit ids, so those branches publish as
+#   fast-forwards. A failed push means reproducibility was lost.
+#
+# The combined branch is the pure function f(published tip, member tips):
+#
+#   Member commits not yet reflected in the published tip are replayed on top
+#   of it. Resume position is recovered from the tip tree (renamed subtree
+#   oids). Same tip plus same members always yield the same commit ids, so the
+#   push is a fast-forward (or a no-op). --verify checks both the tip tree
+#   against the member tips and that a second build reproduces the commit id.
+
+version: 1
+
+sources:
+  autoware_universe:
+    upstream: https://github.com/autowarefoundation/autoware_universe.git
+    ref: main
+    mirror_branch: awf-latest/universe
+    paths:
+      - path: planning/
+      - path: .github/
+      - path: docs/
+      - regex: ^[^/]*$ # root-level files (LICENSE, NOTICE, .cspell.json, ...)
+    message_rules:
+      - pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_universe#\1
+
+  autoware_core:
+    upstream: https://github.com/autowarefoundation/autoware_core.git
+    ref: main
+    mirror_branch: awf-latest/core
+    paths:
+      - path: planning/
+    message_rules:
+      - pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_core#\1
+
+  tier4_universe_e2e:
+    upstream: https://github.com/tier4/autoware_universe.git
+    ref: feat/v0.64/e2e_scenario_pass
+    mirror_branch: feat/v0.64/e2e_scenario_pass
+    paths:
+      - path: planning/
+      - path: .github/
+      - path: docs/
+      - regex: ^[^/]*$
+    # Commits authored before the fork point still refer to upstream pull
+    # requests; later ones refer to the TIER IV fork.
+    message_rules:
+      - until: 2026-02-21T00:00:00Z
+        pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_universe#\1
+      - since: 2026-02-21T00:00:00Z
+        pattern: (?<!autowarefoundation)(?<!autowarefoundation/autoware_universe)#(\d+)
+        replacement: tier4/autoware_universe#\1
+      # git-filter-repo cannot map this hash because the referenced commit is
+      # outside the retained paths.
+      - literal: This reverts commit 8756df69f1ee9241028d10b7f493ed030ee67b1b.
+        replacement: This reverts commit 871a8540ade845c7c9a193029d407b411a4d685b.
+
+  # feat/v0.64/e2e is the integration line in the tier4 fork; the
+  # e2e_scenario_pass source above tracks the branch derived from it. Same
+  # retained paths and same message rewriting, so the two mirrors are
+  # comparable commit for commit.
+  tier4_universe_e2e_v064:
+    upstream: https://github.com/tier4/autoware_universe.git
+    ref: feat/v0.64/e2e
+    mirror_branch: feat/v0.64/e2e
+    paths:
+      - path: planning/
+      - path: .github/
+      - path: docs/
+      - regex: ^[^/]*$
+    message_rules:
+      - until: 2026-02-21T00:00:00Z
+        pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_universe#\1
+      - since: 2026-02-21T00:00:00Z
+        pattern: (?<!autowarefoundation)(?<!autowarefoundation/autoware_universe)#(\d+)
+        replacement: tier4/autoware_universe#\1
+      - literal: This reverts commit 8756df69f1ee9241028d10b7f493ed030ee67b1b.
+        replacement: This reverts commit 871a8540ade845c7c9a193029d407b411a4d685b.
+
+  tier4_core_e2e:
+    upstream: https://github.com/tier4/autoware_core.git
+    ref: feat/v0.64/e2e_scenario_pass
+    # Sibling of feat/v0.64/e2e_scenario_pass: git cannot nest
+    # feat/v0.64/e2e_scenario_pass/core under that branch.
+    mirror_branch: feat/v0.64/e2e_scenario_pass-core
+    paths:
+      - path: planning/
+    message_rules:
+      - until: 2026-02-21T00:00:00Z
+        pattern: '#(\d+)'
+        replacement: autowarefoundation/autoware_core#\1
+      - since: 2026-02-21T00:00:00Z
+        pattern: (?<!autowarefoundation)(?<!autowarefoundation/autoware_core)#(\d+)
+        replacement: tier4/autoware_core#\1
+
+combined:
+  # universe/core only (no launch). New name because e2e-combined-latest embeds
+  # AWF-main launch trees and cannot resume without rewriting.
+  tier4-e2e-combined-latest:
+    # Pending member commits are appended onto the published tip, ordered by
+    # committer date among themselves. Ties break on member order then original
+    # commit id. The result is a deterministic function of (published tip,
+    # member tips) and always fast-forwards.
+    order_by: committer_date
+    # Trusted e2e_scenario_pass histories from the tier4 forks only.
+    members:
+      - source: tier4_universe_e2e
+        rename:
+          planning: universe
+      - source: tier4_core_e2e
+        rename:
+          planning: core
