@@ -3,6 +3,7 @@ project(autoware_behavior_path_planner_common)
 
 find_package(autoware_cmake REQUIRED)
 autoware_package()
+add_compile_options(-Wno-error=deprecated-declarations)
 
 find_package(magic_enum CONFIG REQUIRED)
 
