@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - build_depends*.repos
+      - .github/workflows/check-build-depends.yaml
 
 jobs:
   check-build-depends:
@@ -13,10 +14,10 @@ jobs:
       fail-fast: false
       matrix:
         rosdistro:
-          - humble
+          - jazzy
         include:
-          - rosdistro: humble
-            container: ros:humble
+          - rosdistro: jazzy
+            container: ghcr.io/autowarefoundation/autoware:universe-dependencies-jazzy
     steps:
       - name: Check out repository
         uses: actions/checkout@v4.4.0
@@ -28,22 +29,9 @@ jobs:
         id: get-self-packages
         uses: autowarefoundation/autoware-github-actions/get-self-packages@v1.69.2
 
-      - name: Prepare build_depends.repos file (main branch)
-        if: ${{ github.event.pull_request.base.ref != 'humble' }}
-        uses: ./.github/actions/combine-repos-action
-        with:
-          base_file: build_depends_humble.repos
-          overlay_file: build_depends_nightly.repos
-          output_file: build_depends.repos
-
-      - name: Prepare build_depends.repos file (humble branch)
-        if: ${{ github.event.pull_request.base.ref == 'humble' }}
-        run: cp build_depends_humble.repos build_depends.repos
-        shell: bash
-
       - name: Build
         uses: autowarefoundation/autoware-github-actions/colcon-build@v1.69.2
         with:
           rosdistro: ${{ matrix.rosdistro }}
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
-          build-depends-repos: build_depends.repos
+          build-depends-repos: build_depends_jazzy.repos
