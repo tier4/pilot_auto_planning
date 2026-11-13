@@ -81,7 +81,7 @@ double interpolate_boundary_l(const std::vector<SlPoint> & polyline, double s);
 //! Tightest l of the boundary over [s_lo, s_hi]: min(l) when it forbids its left, max(l) when
 //! its right. Returns false when the interval misses the polyline
 bool lateral_bound_extreme_l(
-  const LateralBoundEntry & bound, double s_lo, double s_hi, double & extreme_l);
+  const LateralBoundEntry & bound, double s_lo_in, double s_hi_in, double & extreme_l);
 
 bool violates_lateral_bound(const LateralBoundEntry & bound, const SlBox & box);
 

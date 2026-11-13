@@ -263,11 +263,11 @@ FrenetSamplingBasedPlanner::ReferenceGrid::ReferenceGrid(
   }
   for (std::size_t i = 0; i < size; ++i) {
     const double s = std::min(static_cast<double>(i) * res_, s_max);
-    const auto position = path.compute(s).point.pose.position;
+    const auto point_position = path.compute(s).point.pose.position;
     const double yaw = path.azimuth(s);
-    x_.push_back(position.x);
-    y_.push_back(position.y);
-    z_.push_back(position.z);
+    x_.push_back(point_position.x);
+    y_.push_back(point_position.y);
+    z_.push_back(point_position.z);
     yaw_.push_back(yaw);
     cos_yaw_.push_back(std::cos(yaw));
     sin_yaw_.push_back(std::sin(yaw));
@@ -537,11 +537,12 @@ std::optional<Trajectory> FrenetSamplingBasedPlanner::plan_one_side(
   phase.reset();
   phase = std::make_unique<autoware_utils_debug::ScopedTimeTrack>("evaluate", *time_keeper_);
   time_keeper_->comment(std::to_string(candidates.size()) + " candidates");
-  const bool optimize_velocity = params_.frenet_sampling_based_planner.velocity_optimizer.enable;
+  const bool velocity_optimizer_enabled =
+    params_.frenet_sampling_based_planner.velocity_optimizer.enable;
   for (auto & candidate : candidates) {
     evaluate(
       context, grid, compiled_constraints, tables, initial_state.l_goal, previous_lateral,
-      optimize_velocity, candidate);
+      velocity_optimizer_enabled, candidate);
   }
 
   phase.reset();
@@ -566,7 +567,7 @@ std::optional<Trajectory> FrenetSamplingBasedPlanner::plan_one_side(
     return best;
   };
 
-  if (optimize_velocity) {
+  if (velocity_optimizer_enabled) {
     if (const auto * path_choice = cheapest(false, false)) {
       phase = std::make_unique<autoware_utils_debug::ScopedTimeTrack>(
         "optimize_candidate_velocity", *time_keeper_);

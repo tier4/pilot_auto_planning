@@ -275,12 +275,14 @@ private:
 
   Trajectory to_trajectory_msg(const PlannerContext & context, const Candidate & candidate) const;
 
+  // cppcheck-suppress functionStatic
   void append_debug_markers(
     const PlannerContext & context, const ReferenceGrid & grid,
     const std::vector<Candidate> & candidates, MarkerArray & debug_markers) const;
 
   //! The lateral bounds of the projected views, drawn at a constant spacing along the
   //! reference_path as thin lines from the centerline to each boundary along the normal
+  // cppcheck-suppress functionStatic
   MarkerArray make_lateral_bounds_markers(
     const PlannerContext & context, const ReferenceGrid & grid,
     const CompiledConstraints & compiled_constraints) const;

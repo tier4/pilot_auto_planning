@@ -417,6 +417,7 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
   }
 
   if (!goal_in_window) {
+    // cppcheck-suppress returnStdMoveLocal ; moves out of the optional, not a local
     return std::move(reference_path.value());
   }
 
@@ -428,6 +429,7 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
     autoware_utils_geometry::calc_distance2d(
       reference_path->compute(s_goal).point.pose, input.goal_pose) >
     params_.reference_path.goal_connection.search_radius_m) {
+    // cppcheck-suppress returnStdMoveLocal ; moves out of the optional, not a local
     return std::move(reference_path.value());
   }
 
@@ -439,6 +441,7 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
   }
 
   reference_path->crop(0.0, std::max(s_goal, s_ego));
+  // cppcheck-suppress returnStdMoveLocal ; moves out of the optional, not a local
   return std::move(reference_path.value());
 }
 
@@ -468,8 +471,8 @@ tl::expected<SafetyPlannerResult, std::string> SafetyPlanner::plan(const SafetyP
 
   SafetyPlannerResult result;
   if (trajectory_planner_) {
-    const TrajectoryPlannerInput input{context, normal_list, cautious_list};
-    auto planner_result = trajectory_planner_->plan_trajectories(input);
+    const TrajectoryPlannerInput planner_input{context, normal_list, cautious_list};
+    auto planner_result = trajectory_planner_->plan_trajectories(planner_input);
     if (params_.engage_velocity.enable) {
       if (planner_result.normal_trajectory) {
         auto & trajectory = planner_result.normal_trajectory->trajectory;
