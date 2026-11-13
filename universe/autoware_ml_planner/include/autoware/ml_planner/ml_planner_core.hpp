@@ -59,8 +59,8 @@ using autoware_perception_msgs::msg::PredictedObjects;
 using autoware_perception_msgs::msg::TrackedObjects;
 using autoware_planning_msgs::msg::LaneletRoute;
 using autoware_planning_msgs::msg::Trajectory;
-using autoware_vehicle_msgs::msg::TurnIndicatorsCommand;
 using autoware_vehicle_msgs::msg::SteeringReport;
+using autoware_vehicle_msgs::msg::TurnIndicatorsCommand;
 using autoware_vehicle_msgs::msg::TurnIndicatorsReport;
 using nav_msgs::msg::Odometry;
 using unique_identifier_msgs::msg::UUID;
@@ -120,6 +120,7 @@ struct MLPlannerParams
   optimization::TrajectoryOptimizationParams trajectory_optimization;
   postprocess::RoadBorderAvoidanceParams road_border_avoidance;
   postprocess::StopPointFixingParams stop_point_fixing;
+  double turn_indicator_hold_duration_sec;
 };
 
 /**
@@ -258,7 +259,7 @@ public:
    * @brief Count valid elements in input data for diagnostics.
    *
    * @param input_data_map Input data map
-   * @param data_key Key to count (e.g., "lanes", "route_lanes", "intersection_area")
+   * @param data_key Key to count (e.g., "lanes", "route_waypoints", "intersection_area")
    * @return Count of valid elements
    */
   int64_t count_valid_elements(
@@ -290,6 +291,7 @@ private:
 
   // Postprocessing
   std::vector<preprocess::SelectedAgent> selected_agents_;
+  postprocess::TurnIndicatorHold turn_indicator_hold_;
 
   // Raw message history buffers, bounded to the model input time window.
   // All derived history data is computed statelessly from these buffers.
