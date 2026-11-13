@@ -83,8 +83,8 @@ std::optional<std::string> diffusion_planner_actuator_prefix(NodeT & node)
 
 template <typename NodeT>
 float read_actuator_scalar(
-  NodeT & node, const std::string & flat_name,
-  const std::optional<std::string> & nested_prefix, const float default_value)
+  NodeT & node, const std::string & flat_name, const std::optional<std::string> & nested_prefix,
+  const float default_value)
 {
   if (nested_prefix) {
     const std::string nested_name = *nested_prefix + flat_name;
@@ -174,8 +174,7 @@ template void declare_first_order_dubins_mppi_vehicle_dynamics_params<
   autoware::agnocast_wrapper::Node>(autoware::agnocast_wrapper::Node &);
 template FirstOrderDubinsMppiVehicleParams get_first_order_dubins_mppi_vehicle_params<rclcpp::Node>(
   rclcpp::Node &);
-template FirstOrderDubinsMppiVehicleParams
-get_first_order_dubins_mppi_vehicle_params<autoware::agnocast_wrapper::Node>(
-  autoware::agnocast_wrapper::Node &);
+template FirstOrderDubinsMppiVehicleParams get_first_order_dubins_mppi_vehicle_params<
+  autoware::agnocast_wrapper::Node>(autoware::agnocast_wrapper::Node &);
 
 }  // namespace autoware::mppi_optimizer

@@ -436,14 +436,12 @@ void applyActiveVelocityLimitProfile(
   }
   for (std::size_t index = begin_index; index < trajectory.points.size(); ++index) {
     auto & point = trajectory.points[index];
-    const float candidate_velocity = index < profile.velocities.size()
-                                       ? profile.velocities[index]
-                                       : profile.target_velocity;
+    const float candidate_velocity =
+      index < profile.velocities.size() ? profile.velocities[index] : profile.target_velocity;
     const float candidate_acceleration =
       index < profile.velocities.size() ? profile.accelerations[index] : 0.0F;
     // The profile is a cap. A candidate above the value already on the point would erase a stop.
-    point.longitudinal_velocity_mps =
-      std::min(point.longitudinal_velocity_mps, candidate_velocity);
+    point.longitudinal_velocity_mps = std::min(point.longitudinal_velocity_mps, candidate_velocity);
     point.acceleration_mps2 = std::min(point.acceleration_mps2, candidate_acceleration);
   }
 }
