@@ -1072,6 +1072,11 @@
               "description": "Treat unknown light as red light",
               "default": false
             },
+            "enable_arrow_aware_amber_passing": {
+              "type": "boolean",
+              "description": "Allow passing on amber after Green Circle when on a turn lane with a mapped static arrow",
+              "default": true
+            },
             "overshoot_tolerance": {
               "type": "number",
               "description": "Overshoot tolerance [m]",
@@ -1100,6 +1105,12 @@
               "type": "number",
               "description": "Threshold for stable duration of amber light [s]",
               "default": 0.2,
+              "minimum": 0
+            },
+            "th_stable_duration_unknown": {
+              "type": "number",
+              "description": "Threshold for stable duration of unknown light [s]",
+              "default": 0.5,
               "minimum": 0
             },
             "th_amber_rejection_hysteresis": {
@@ -1203,6 +1214,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable Temporal MPT optimizer plugin (acados-based kinematic bicycle MPC for combined geometry and velocity optimization)"
+        },
+        "use_time_sequence_raw_optimizer": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable pose-only time-sequence raw optimizer (road-border shift then acados kinematic bicycle)"
         },
         "max_vel": {
           "type": "number",
