@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore radps
 #include "mppi_planner.hpp"
 
 #include "../../utils/frenet_utils.hpp"
@@ -706,9 +707,9 @@ std::optional<std::string> MppiPlanner::refine(
 
   splice_st.reset();
 
-  std::string reason;
   {
     autoware_utils_debug::ScopedTimeTrack check_st("satisfies_constraints", *time_keeper_);
+    std::string reason;
     if (!satisfies_constraints(context, compiled_constraints, projector, refined, reason)) {
       return "output violates " + reason;
     }

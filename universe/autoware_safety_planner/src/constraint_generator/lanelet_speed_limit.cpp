@@ -87,7 +87,6 @@ ConstraintGeneratorOutput LaneletSpeedLimitConstraintGenerator::generate_constra
   struct LaneletSpan  // <'a>
   {
     std::size_t lanelet_index;  // <'a> of lanelets
-    double s_begin;
     double s_end;
   };
   std::vector<LaneletSpan> spans;
@@ -101,12 +100,12 @@ ConstraintGeneratorOutput LaneletSpeedLimitConstraintGenerator::generate_constra
     index = match_belonging_lanelet(lanelets, index, lanelet::BasicPoint2d(position.x, position.y))
               .value_or(index);
     if (spans.empty()) {
-      spans.push_back(LaneletSpan{index, 0.0, 0.0});
+      spans.push_back(LaneletSpan{index, 0.0});
     } else if (spans.back().lanelet_index == index) {
       spans.back().s_end = s;
     } else {
       spans.back().s_end = s;
-      spans.push_back(LaneletSpan{index, s, s});
+      spans.push_back(LaneletSpan{index, s});
     }
   }
 

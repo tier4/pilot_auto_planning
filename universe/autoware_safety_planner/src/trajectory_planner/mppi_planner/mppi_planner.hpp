@@ -78,10 +78,12 @@ private:
     Trajectory & reference, TrajectoryPlannerDebug & debug);
 
   //! The GPU resources are allocated on the first call, once the steer bounds are known
+  // cppcheck-suppress functionConst ; allocates the GPU resources
   void ensure_initialized(
     MppiInterface & optimizer, const PlannerContext & context,
     const CompiledConstraints & compiled_constraints);
 
+  // cppcheck-suppress functionStatic
   bool satisfies_constraints(
     const PlannerContext & context, const CompiledConstraints & compiled_constraints,
     const PathProjector & projector, const Trajectory & trajectory, std::string & reason) const;

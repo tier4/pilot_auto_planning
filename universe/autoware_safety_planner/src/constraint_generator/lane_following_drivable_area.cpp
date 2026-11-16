@@ -76,13 +76,13 @@ std::vector<Point2d> offset_towards(
   offset.reserve(polyline.size());
   for (const auto & vertex : polyline) {
     const lanelet::BasicPoint2d q{vertex.x(), vertex.y()};
-    const auto to_inner = closest_point_on_polyline(q, inner) - q;
+    const lanelet::BasicPoint2d to_inner = closest_point_on_polyline(q, inner) - q;
     const double dist = to_inner.norm();
     if (dist <= margin_m) {
       offset.push_back(vertex);
       continue;
     }
-    const auto moved = q + to_inner * (margin_m / dist);
+    const lanelet::BasicPoint2d moved = q + to_inner * (margin_m / dist);
     offset.emplace_back(moved.x(), moved.y());
   }
   return offset;

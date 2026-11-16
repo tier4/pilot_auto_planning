@@ -300,7 +300,7 @@ void ObstacleStopConstraintGenerator::update_collision_points_buffer(
   collision_points_buffer_.erase(
     std::remove_if(
       collision_points_buffer_.begin(), collision_points_buffer_.end(),
-      [&](CollisionPoint & cp) {
+      [&](const CollisionPoint & cp) {
         if (cp.is_active) return (now - cp.last_seen).seconds() > p.off_time_buffer;
         return !collision_point;
       }),
