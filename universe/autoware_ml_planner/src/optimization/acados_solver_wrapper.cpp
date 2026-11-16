@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore yref
 #include "autoware/ml_planner/optimization/acados_solver_wrapper.hpp"
 
 #include <algorithm>
