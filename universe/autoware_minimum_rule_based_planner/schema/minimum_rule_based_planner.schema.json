@@ -242,6 +242,12 @@
                   "description": "Lateral acceleration limit for shift [m/s^2]",
                   "default": 0.8,
                   "minimum": 0.0
+                },
+                "curvature_limit": {
+                  "type": "number",
+                  "description": "Curvature limit of the shift polynomial [1/m]",
+                  "default": 0.156,
+                  "minimum": 0.0
                 }
               },
               "required": [],

@@ -68,7 +68,7 @@ public:
 
   // entry point to generate start goal trajectory
   std::optional<PathPointTrajectory> plan(
-    const PathPointTrajectory & trajectory, lanelet::ConstLanelet & current_lanelet,
+    const PathPointTrajectory & trajectory, const lanelet::ConstLanelet & current_lanelet,
     const double & s_path_end, const geometry_msgs::msg::Pose & ego_pose);
 
   // Route / map initialisation
@@ -131,14 +131,14 @@ private:
     const geometry_msgs::msg::Pose & ego_pose);
   std::optional<PathPointTrajectory> generate_and_evaluate_trajectory(
     const std::vector<AvailableArea> & available_area, const geometry_msgs::msg::Pose & ego_pose,
-    std::vector<PathPointWithLaneId> start_pose_candidates,
-    std::vector<PathPointWithLaneId> goal_pose_candidates);
+    const std::vector<PathPointWithLaneId> & start_pose_candidates,
+    const std::vector<PathPointWithLaneId> & goal_pose_candidates);
 
   // connect input trajectory and generated pull-trajectory
   std::optional<PathPointTrajectory> connect_pull_trajectory(
     const PathPointTrajectory & trajectory, const PathPointTrajectory & pull_trajectory,
     const std::vector<AvailableArea> & available_area);
-  std::optional<PathPointTrajectory> connect_start_planner_trajectory(
+  static std::optional<PathPointTrajectory> connect_start_planner_trajectory(
     const PathPointTrajectory & trajectory, std::vector<PathPointWithLaneId> pull_points);
   std::optional<PathPointTrajectory> connect_goal_planner_trajectory(
     const PathPointTrajectory & trajectory, std::vector<PathPointWithLaneId> pull_points);
@@ -150,7 +150,7 @@ private:
   bool start_planner_act_{false};
   bool goal_planner_act_{false};
 
-  // lached trajectory generated at previous time step
+  // latched trajectory generated at previous time step
   std::optional<PathPointTrajectory> generated_trajectory_{std::nullopt};
   std::optional<Pose> goal_pose_prev_{std::nullopt};
 

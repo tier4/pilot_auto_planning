@@ -322,7 +322,7 @@ void StartGoalPlanner::update_params(const StartGoalPlannerParams & params)
 }
 
 std::optional<PathPointTrajectory> StartGoalPlanner::plan(
-  const PathPointTrajectory & trajectory, lanelet::ConstLanelet & current_lanelet,
+  const PathPointTrajectory & trajectory, const lanelet::ConstLanelet & current_lanelet,
   const double & s_path_end, const geometry_msgs::msg::Pose & ego_pose)
 {
   const auto available_area = get_available_area(trajectory);
@@ -711,8 +711,8 @@ std::optional<double> StartGoalPlanner::evaluate_trajectory(
 
 std::optional<PathPointTrajectory> StartGoalPlanner::generate_and_evaluate_trajectory(
   const std::vector<AvailableArea> & available_area, const geometry_msgs::msg::Pose & ego_pose,
-  std::vector<PathPointWithLaneId> start_pose_candidates,
-  std::vector<PathPointWithLaneId> goal_pose_candidates)
+  const std::vector<PathPointWithLaneId> & start_pose_candidates,
+  const std::vector<PathPointWithLaneId> & goal_pose_candidates)
 {
   const auto first_steer_angles_rad = generate_candidate_steer_angles_rad(
     vehicle_info_.max_steer_angle_rad, params_.steer_angle_trial_count);

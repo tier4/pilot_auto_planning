@@ -92,8 +92,8 @@ bool is_private(const lanelet::ConstLanelet & lanelet)
 // synthesized line but the first; negative ids can never collide with real map ids.
 lanelet::ConstLineString3d make_entry_edge(const lanelet::ConstLanelet & lanelet)
 {
-  const auto & lp = lanelet.leftBound().front();
-  const auto & rp = lanelet.rightBound().front();
+  const auto lp = lanelet.leftBound().front();
+  const auto rp = lanelet.rightBound().front();
   return lanelet::LineString3d(
     -lanelet.id(), {lanelet::Point3d(lanelet::InvalId, lp.x(), lp.y(), lp.z()),
                     lanelet::Point3d(lanelet::InvalId, rp.x(), rp.y(), rp.z())});

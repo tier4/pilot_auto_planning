@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef PLANNING__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__UTILS__TRAJECTORY_POLYGON_UTILS_HPP_
-#define PLANNING__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__UTILS__TRAJECTORY_POLYGON_UTILS_HPP_
+#ifndef UNIVERSE__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__UTILS__TRAJECTORY_POLYGON_UTILS_HPP_
+#define UNIVERSE__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__UTILS__TRAJECTORY_POLYGON_UTILS_HPP_
 
 #include <autoware/trajectory/trajectory_point.hpp>
 #include <autoware/vehicle_info_utils/vehicle_info.hpp>
@@ -47,5 +47,5 @@ std::vector<Polygon2d> create_one_step_polygons(
 }  // namespace autoware::minimum_rule_based_planner::plugin::trajectory_polygon_utils
 
 // clang-format off
-#endif  // PLANNING__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__UTILS__TRAJECTORY_POLYGON_UTILS_HPP_  // NOLINT
+#endif  // UNIVERSE__AUTOWARE_MINIMUM_RULE_BASED_PLANNER__PLUGINS__UTILS__TRAJECTORY_POLYGON_UTILS_HPP_  // NOLINT
 // clang-format on
