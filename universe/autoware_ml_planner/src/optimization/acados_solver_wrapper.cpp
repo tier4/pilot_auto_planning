@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore yref
 #include "autoware/ml_planner/optimization/acados_solver_wrapper.hpp"
 
 #include <algorithm>
@@ -241,7 +242,6 @@ SolverSolution AcadosSolverWrapper::solve(
   stage_weight_matrix[kYJerk * gen_ny + kYJerk] = unscale * impl_->params.weight_jerk;
   stage_weight_matrix[kYDeltaRate * gen_ny + kYDeltaRate] =
     unscale * impl_->params.weight_steering_rate;
-  std::array<double, gen_ny> yref{};
   for (size_t stage = 0; stage < gen_n; ++stage) {
     // Stage 0 tracks the (fixed) initial state, so its state penalties contribute no cost
     // and only the input regularization is left; it gets no temporal reference either.
@@ -290,7 +290,7 @@ SolverSolution AcadosSolverWrapper::solve(
       impl_->config, impl_->dims, impl_->in, static_cast<int>(stage), "W",
       stage_weight_matrix.data());
 
-    yref = {
+    std::array<double, gen_ny> yref = {
       blended_position[0], blended_position[1], blended_yaw, blended_velocity, 0.0, 0.0, 0.0, 0.0};
     ocp_nlp_cost_model_set(
       impl_->config, impl_->dims, impl_->in, static_cast<int>(stage), "yref", yref.data());

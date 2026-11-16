@@ -163,12 +163,9 @@ void MLPlannerCore::load_model()
       params_.plugins_path);
 #endif
   } else {
-    if (params_.backend != "tensorrt") {
-      throw std::invalid_argument(
-        "Unsupported model.backend '" + params_.backend +
-        "'. ONNX Runtime support is not available in this build.");
-    }
-    throw std::invalid_argument("Unsupported model.backend '" + params_.backend + "'.");
+    throw std::invalid_argument(
+      "Unsupported model.backend '" + params_.backend +
+      "'. ONNX Runtime support is not available in this build.");
   }
 }
 
@@ -433,6 +430,7 @@ PlannerOutput MLPlannerCore::create_planner_output(
     (void)current_acceleration_mps2;
 #endif
 
+    // cppcheck-suppress knownConditionTrueFalse ; only set when built with acados
     if (optimization_failed) {
       continue;
     }

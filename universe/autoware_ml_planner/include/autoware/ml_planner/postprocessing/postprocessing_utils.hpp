@@ -89,8 +89,7 @@ PredictedObjects create_predicted_objects(
  */
 Trajectory create_ego_trajectory(
   const std::vector<std::vector<std::vector<Eigen::Matrix4d>>> & agent_poses,
-  const rclcpp::Time & stamp, const geometry_msgs::msg::Point & base_position,
-  int64_t batch_index);
+  const rclcpp::Time & stamp, const geometry_msgs::msg::Point & base_position, int64_t batch_index);
 
 /**
  * @brief Counts valid elements in a tensor with shape (B, len, dim2, dim3).

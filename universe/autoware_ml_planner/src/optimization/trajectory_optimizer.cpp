@@ -201,9 +201,9 @@ OptimizationResult TrajectoryOptimizer::optimize(
       ref.y = interpolate(from[1], to[1]);
       // The previous solution's yaw is continuous within itself but lives on its own branch;
       // put it on the branch of this stage's tracking reference so the two can be blended.
-      const double previous_yaw = interpolate(from[2], to[2]);
-      ref.yaw =
-        references[k].yaw + autoware_utils::normalize_radian(previous_yaw - references[k].yaw);
+      const double previous_solution_yaw = interpolate(from[2], to[2]);
+      ref.yaw = references[k].yaw +
+                autoware_utils::normalize_radian(previous_solution_yaw - references[k].yaw);
       ref.velocity = interpolate(from[3], to[3]);
     }
     temporal_references_ptr = &temporal_references;

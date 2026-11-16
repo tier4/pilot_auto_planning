@@ -59,8 +59,8 @@ using autoware_perception_msgs::msg::PredictedObjects;
 using autoware_perception_msgs::msg::TrackedObjects;
 using autoware_planning_msgs::msg::LaneletRoute;
 using autoware_planning_msgs::msg::Trajectory;
-using autoware_vehicle_msgs::msg::TurnIndicatorsCommand;
 using autoware_vehicle_msgs::msg::SteeringReport;
+using autoware_vehicle_msgs::msg::TurnIndicatorsCommand;
 using autoware_vehicle_msgs::msg::TurnIndicatorsReport;
 using nav_msgs::msg::Odometry;
 using unique_identifier_msgs::msg::UUID;
@@ -292,7 +292,7 @@ private:
   std::vector<preprocess::SelectedAgent> selected_agents_;
 
   // Raw message history buffers, bounded to the model input time window.
-  // All derived history data is computed statelessly from these buffers.
+  // All derived history data is computed from these buffers without extra state.
   utils::TimedBuffer<Odometry> ego_history_{
     HISTORY_WINDOW_S, [](const Odometry & msg) { return rclcpp::Time(msg.header.stamp); }};
   utils::TimedBuffer<SteeringReport> steering_history_{

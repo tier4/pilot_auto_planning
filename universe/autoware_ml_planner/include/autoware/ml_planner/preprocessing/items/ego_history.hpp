@@ -46,8 +46,9 @@ namespace autoware::ml_planner::preprocess
  */
 xt::xarray<float> create_ego_history(
   const MessageView<nav_msgs::msg::Odometry> & odom_msgs,
-  const MessageView<autoware_vehicle_msgs::msg::SteeringReport> & steering_msgs, size_t num_timesteps,
-  const Eigen::Matrix4d & map_to_ego_transform, const rclcpp::Time & reference_time);
+  const MessageView<autoware_vehicle_msgs::msg::SteeringReport> & steering_msgs,
+  size_t num_timesteps, const Eigen::Matrix4d & map_to_ego_transform,
+  const rclcpp::Time & reference_time);
 
 }  // namespace autoware::ml_planner::preprocess
 

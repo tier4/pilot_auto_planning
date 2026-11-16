@@ -40,6 +40,7 @@
 #include <vector>
 
 #ifndef ML_PLANNER_WEIGHT_MAJOR_VERSION
+// cppcheck-suppress preprocessorErrorDirective
 #error "ML_PLANNER_WEIGHT_MAJOR_VERSION must be defined by CMake"
 #endif
 
