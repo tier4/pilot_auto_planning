@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef PLANNING__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__TRAJECTORY_MODIFIER_TEST_UTILS_HPP_
-#define PLANNING__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__TRAJECTORY_MODIFIER_TEST_UTILS_HPP_
+#ifndef UNIVERSE__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__TRAJECTORY_MODIFIER_TEST_UTILS_HPP_
+#define UNIVERSE__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__TRAJECTORY_MODIFIER_TEST_UTILS_HPP_
 
 #include "autoware/trajectory_modifier/trajectory_modifier_plugin_base.hpp"
 
@@ -30,4 +30,4 @@ bool process_plugin(
 
 }  // namespace autoware::trajectory_modifier::test
 
-#endif  // PLANNING__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__TRAJECTORY_MODIFIER_TEST_UTILS_HPP_
+#endif  // UNIVERSE__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__TRAJECTORY_MODIFIER_TEST_UTILS_HPP_

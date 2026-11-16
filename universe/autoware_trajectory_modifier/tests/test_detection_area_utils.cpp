@@ -92,8 +92,9 @@ TEST(DetectionAreaUtils, StopPointReturnsEmptyWhenTrajectoryDoesNotCrossLine)
   points.push_back(make_point(0.0, 10.0));
   points.push_back(make_point(20.0, 10.0));
   const auto path = *Trajectory::Builder{}.build(points);
-  EXPECT_FALSE(autoware::trajectory_modifier::utils::detection_area::get_stop_point(
-    path, make_line(10.0), 0.0, 0.0));
+  EXPECT_FALSE(
+    autoware::trajectory_modifier::utils::detection_area::get_stop_point(
+      path, make_line(10.0), 0.0, 0.0));
 }
 
 TEST(DetectionAreaUtils, PointCloudDetectionUsesPolygonInterior)
@@ -152,8 +153,9 @@ TEST(DetectionAreaUtils, TargetFilteringUsesHighestProbabilityClassification)
   high_probability_car.label = Classification::CAR;
   high_probability_car.probability = 0.9F;
 
-  EXPECT_TRUE(autoware::trajectory_modifier::utils::detection_area::is_target_object(
-    {low_probability_pedestrian, high_probability_car}, filtering));
+  EXPECT_TRUE(
+    autoware::trajectory_modifier::utils::detection_area::is_target_object(
+      {low_probability_pedestrian, high_probability_car}, filtering));
   EXPECT_EQ(
     autoware::trajectory_modifier::utils::detection_area::object_label_to_string(
       Classification::CAR),
@@ -163,12 +165,15 @@ TEST(DetectionAreaUtils, TargetFilteringUsesHighestProbabilityClassification)
 TEST(DetectionAreaUtils, StopStateClearsOnlyAfterConfiguredDuration)
 {
   const std::optional<rclcpp::Time> last_obstacle{rclcpp::Time(10, 0)};
-  EXPECT_FALSE(autoware::trajectory_modifier::utils::detection_area::can_clear_stop_state(
-    last_obstacle, rclcpp::Time(11, 0), 2.0));
-  EXPECT_TRUE(autoware::trajectory_modifier::utils::detection_area::can_clear_stop_state(
-    last_obstacle, rclcpp::Time(12, 0), 2.0));
-  EXPECT_TRUE(autoware::trajectory_modifier::utils::detection_area::can_clear_stop_state(
-    std::nullopt, rclcpp::Time(0, 0), 2.0));
+  EXPECT_FALSE(
+    autoware::trajectory_modifier::utils::detection_area::can_clear_stop_state(
+      last_obstacle, rclcpp::Time(11, 0), 2.0));
+  EXPECT_TRUE(
+    autoware::trajectory_modifier::utils::detection_area::can_clear_stop_state(
+      last_obstacle, rclcpp::Time(12, 0), 2.0));
+  EXPECT_TRUE(
+    autoware::trajectory_modifier::utils::detection_area::can_clear_stop_state(
+      std::nullopt, rclcpp::Time(0, 0), 2.0));
 }
 
 TEST(DetectionAreaUtils, FeasibleStopDistanceIsSafeForInvalidAcceleration)
@@ -191,8 +196,9 @@ TEST(DetectionAreaUtils, ShortTrajectoryChecksFrontWithoutExtendingPath)
   ASSERT_TRUE(stop);
   EXPECT_NEAR(*stop, 6.0, 1e-6);
   EXPECT_DOUBLE_EQ(path.length(), 8.0);
-  EXPECT_FALSE(autoware::trajectory_modifier::utils::detection_area::get_stop_point(
-    path, make_line(12.0), 0.0, 3.0));
+  EXPECT_FALSE(
+    autoware::trajectory_modifier::utils::detection_area::get_stop_point(
+      path, make_line(12.0), 0.0, 3.0));
 }
 
 TEST(DetectionAreaUtils, FrontExtensionUsesTerminalHeadingAndDeadlineMargin)
@@ -213,6 +219,7 @@ TEST(DetectionAreaUtils, FrontExtensionUsesTerminalHeadingAndDeadlineMargin)
   ASSERT_TRUE(stop);
   EXPECT_NEAR(*stop, 2.0, 1e-6);
   EXPECT_DOUBLE_EQ(path.length(), 2.0);
-  EXPECT_FALSE(autoware::trajectory_modifier::utils::detection_area::get_stop_point(
-    path, make_line(1.0), 0.0, 2.0));
+  EXPECT_FALSE(
+    autoware::trajectory_modifier::utils::detection_area::get_stop_point(
+      path, make_line(1.0), 0.0, 2.0));
 }

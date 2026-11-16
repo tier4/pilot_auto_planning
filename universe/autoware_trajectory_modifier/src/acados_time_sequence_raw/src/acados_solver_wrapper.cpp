@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore yref
 #include "autoware/trajectory_modifier/time_sequence_raw/acados_solver_wrapper.hpp"
 
 #include <algorithm>
@@ -305,8 +306,8 @@ SolverSolution AcadosSolverWrapper::solve(
     terminal_yaw_weight = terminal_scale * impl_->params.weight_yaw;
     if (goal_terminal_reference) {
       const auto & goal = impl_->params.goal;
-      const auto goal_block = position_block(
-        goal_terminal_reference->yaw, goal.weight_longitudinal, goal.weight_lateral);
+      const auto goal_block =
+        position_block(goal_terminal_reference->yaw, goal.weight_longitudinal, goal.weight_lateral);
       for (size_t i = 0; i < terminal_block.size(); ++i) {
         terminal_block[i] += goal_block[i];
       }

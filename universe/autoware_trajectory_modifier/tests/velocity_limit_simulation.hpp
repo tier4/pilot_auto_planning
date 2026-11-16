@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef PLANNING__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__VELOCITY_LIMIT_SIMULATION_HPP_
-#define PLANNING__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__VELOCITY_LIMIT_SIMULATION_HPP_
+#ifndef UNIVERSE__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__VELOCITY_LIMIT_SIMULATION_HPP_
+#define UNIVERSE__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__VELOCITY_LIMIT_SIMULATION_HPP_
 
 // Closed-loop harness for the external and map velocity limit plugins. Every planning cycle an
 // upstream planner model emits a time-sampled trajectory from the current ego state, the plugin
@@ -1723,9 +1723,10 @@ inline void run_and_expect(const Scenario & scenario, const std::vector<Stage> &
     }
   }
   for (const auto & name : scenario.expected_failed_checks) {
-    EXPECT_TRUE(std::any_of(
-      evaluation.checks.begin(), evaluation.checks.end(),
-      [&](const Check & check) { return check.name == name; }))
+    EXPECT_TRUE(
+      std::any_of(
+        evaluation.checks.begin(), evaluation.checks.end(),
+        [&](const Check & check) { return check.name == name; }))
       << "Expected diagnostic check is missing: " << name << "\n  data: " << meta.string();
   }
 }
@@ -1773,4 +1774,4 @@ inline std::vector<RecordedPoint> load_recorded_trajectory(const std::string & f
 
 }  // namespace autoware::trajectory_modifier::test::velocity_limit_simulation
 
-#endif  // PLANNING__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__VELOCITY_LIMIT_SIMULATION_HPP_
+#endif  // UNIVERSE__AUTOWARE_TRAJECTORY_MODIFIER__TESTS__VELOCITY_LIMIT_SIMULATION_HPP_

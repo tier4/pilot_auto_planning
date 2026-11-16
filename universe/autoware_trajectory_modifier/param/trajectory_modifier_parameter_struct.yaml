@@ -1699,7 +1699,7 @@ trajectory_modifier_params:
       default_value: stop_after_stopline
       description: Policy when the vehicle cannot stop before the stop line
       validation:
-        one_of<>: [["go", "force_stop", "stop_after_stopline"]]
+        one_of<>: [[go, force_stop, stop_after_stopline]]
       read_only: false
     state_clear_time:
       type: double

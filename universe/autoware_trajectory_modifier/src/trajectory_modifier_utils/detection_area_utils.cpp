@@ -21,11 +21,14 @@
 #include <autoware_perception_msgs/msg/object_classification.hpp>
 
 #include <boost/geometry/algorithms/intersection.hpp>
+
 #include <lanelet2_core/geometry/Point.h>
 #include <lanelet2_core/geometry/Polygon.h>
 
 #include <algorithm>
 #include <cmath>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace autoware::trajectory_modifier::utils::detection_area
