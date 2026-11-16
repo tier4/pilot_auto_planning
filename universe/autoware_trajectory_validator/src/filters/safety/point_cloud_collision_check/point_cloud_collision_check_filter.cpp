@@ -64,6 +64,7 @@ PointCloudCollisionCheckFilter::result_t PointCloudCollisionCheckFilter::is_feas
   // memo: assume trajectory_selector subscribes "/perception/obstacle_segmentation/pointcloud" or
   // "/perception/segmented/pointcloud" that was published from ptv3 node
 
+  // cppcheck-suppress knownConditionTrueFalse ; is_available_data() is a stub until it is ported
   if (!is_available_data(candidate_trajectory, context)) {
     return ValidationResult{};
   }

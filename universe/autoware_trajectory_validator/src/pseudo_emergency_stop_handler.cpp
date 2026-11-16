@@ -37,8 +37,8 @@ PseudoEmergencyStopHandler::PseudoEmergencyStopHandler(autoware::agnocast_wrappe
 : logger_(node.get_logger()),
   clock_(node.get_clock()),
   planning_factor_interface_(
-    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterfaceT<autoware::agnocast_wrapper::Node>>(
-      &node, "pseudo_emergency_stop"))
+    std::make_unique<autoware::planning_factor_interface::PlanningFactorInterfaceT<
+      autoware::agnocast_wrapper::Node>>(&node, "pseudo_emergency_stop"))
 {
 }
 

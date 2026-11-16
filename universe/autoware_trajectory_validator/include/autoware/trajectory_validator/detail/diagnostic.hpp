@@ -49,8 +49,8 @@ using FilterConfiguredActionsMap = std::unordered_map<std::string, ConfiguredAct
 //   { "trajectory_validator_uncrossable_boundary_departure_danger" → DiagnosticsInterface,
 //     "trajectory_validator_uncrossable_boundary_departure_fatal"  → DiagnosticsInterface }
 using DiagnosticInterfaceMap = std::unordered_map<
-  std::string,
-  std::unique_ptr<autoware_utils_diagnostics::BasicDiagnosticsInterface<autoware::agnocast_wrapper::Node>>>;
+  std::string, std::unique_ptr<autoware_utils_diagnostics::BasicDiagnosticsInterface<
+                 autoware::agnocast_wrapper::Node>>>;
 
 /**
  * @brief Builds a FilterConfiguredActionsMap from a configured_actions string array loaded from

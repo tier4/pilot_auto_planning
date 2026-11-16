@@ -176,11 +176,10 @@ std::vector<CrosswalkOnTrajectory> filter_crosswalks_intersecting_trajectory(
       std::optional<lanelet::BasicPoints2d> stop_line;
       for (const auto & sl : stop_lines) {
         const auto stop_line_2d = lanelet::utils::to2D(sl).basicLineString();
-        auto distance = 0.0;
         lanelet::BasicPoints2d intersection_points;
         boost::geometry::intersection(traj_seg, stop_line_2d, intersection_points);
         if (!intersection_points.empty()) {
-          distance += static_cast<double>(
+          const auto distance = static_cast<double>(
             boost::geometry::distance(traj_seg.front(), intersection_points.front()));
           if (distance < distance_to_stop_line) {
             distance_to_stop_line = checked_length + distance;
@@ -720,9 +719,9 @@ void CrosswalkFilter::update_debug_data(
 
   double remaining_time{};
   auto add_objects_marker = [&](const auto & cw) {
-    int obj_id = 0;
     remaining_time = 0.0;
     if (crosswalk_objects_map_.count(cw.crosswalk_info.crosswalk->id())) {
+      int obj_id = 0;
       auto min_obj_duration = params_.stop_duration;
       for (const auto & cw_object : crosswalk_objects_map_[cw.crosswalk_info.crosswalk->id()]) {
         const auto obj_duration = (cw_object.last_seen_time - cw_object.first_seen_time).seconds();

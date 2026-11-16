@@ -38,7 +38,8 @@ DiagnosticInterfaceMap build_diagnostic_interface_map(
     if (!status_name.empty() && !diag_by_name.count(status_name)) {
       diag_by_name.emplace(
         status_name,
-        std::make_unique<autoware_utils_diagnostics::BasicDiagnosticsInterface<autoware::agnocast_wrapper::Node>>(
+        std::make_unique<
+          autoware_utils_diagnostics::BasicDiagnosticsInterface<autoware::agnocast_wrapper::Node>>(
           &node, status_name));
     }
   };
