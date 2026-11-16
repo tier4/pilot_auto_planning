@@ -11,10 +11,16 @@ on:
 
 jobs:
   build-and-test-daily:
+    strategy:
+      fail-fast: false
+      matrix:
+        # "-cuda" is build-only (see build-and-test-reusable.yaml).
+        container-suffix: ["", -cuda]
     uses: ./.github/workflows/build-and-test-reusable.yaml
     with:
       runner: "['ubuntu-24.04']"
       container: ghcr.io/autowarefoundation/autoware:universe-devel-jazzy
+      container-suffix: ${{ matrix.container-suffix }}
       pull-ccache: true
       push-ccache: ${{ github.event_name != 'pull_request' }}
-      concurrency-group: build-and-test-daily-${{ github.ref }}-${{ github.run_id }}
+      concurrency-group: build-and-test-daily${{ matrix.container-suffix }}-${{ github.ref }}-${{ github.run_id }}
