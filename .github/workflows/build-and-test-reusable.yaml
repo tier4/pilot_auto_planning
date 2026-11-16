@@ -146,12 +146,14 @@ jobs:
         shell: bash
 
       # Placed after "Get self packages" so the CUDA dependencies are not treated as self packages.
+      # cspell:ignore libcufft
       - name: Prepare CUDA dependencies
         if: ${{ inputs.container-suffix == '-cuda' }}
         run: |
           # shortcut: cuFFT is not in the image and has no rosdep key; the package name follows the image's CUDA version (13.0).
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y libcufft-dev-13-0
+          mkdir -p cuda_dependency_ws
           vcs import --recursive cuda_dependency_ws < build_depends_cuda.repos
           # pilot_auto_common already provides autoware_cuda_dependency_meta.
           rm -rf cuda_dependency_ws/autoware/autoware_cuda/autoware_cuda_dependency_meta
