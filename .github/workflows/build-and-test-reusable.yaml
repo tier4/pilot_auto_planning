@@ -54,6 +54,9 @@ env:
 jobs:
   build-and-test:
     runs-on: ${{ fromJson(inputs.runner) }}
+    env:
+      # Judge from the full image name, e.g. universe-devel-cuda-jazzy.
+      BUILD_TYPE_CUDA_STATE: ${{ contains(format('{0}{1}', inputs.container, inputs.container-suffix), '-cuda') && 'cuda' || 'nocuda' }}
     container:
       image: ${{ inputs.container }}${{ inputs.container-suffix }}
       options: --cap-add=NET_ADMIN
@@ -89,7 +92,7 @@ jobs:
         run: lscpu && free -h
 
       - name: Ignore packages that require CUDA
-        if: ${{ inputs.container-suffix != '-cuda' }}
+        if: ${{ env.BUILD_TYPE_CUDA_STATE != 'cuda' }}
         run: |
           touch universe/autoware_diffusion_planner/COLCON_IGNORE
           touch universe/autoware_ml_planner/COLCON_IGNORE
@@ -117,9 +120,9 @@ jobs:
         with:
           path: |
             /root/.ccache
-          key: ccache-main${{ inputs.container-suffix }}-${{ runner.arch }}-${{ inputs.rosdistro }}-${{ github.sha }}
+          key: ccache-main${{ env.BUILD_TYPE_CUDA_STATE == 'cuda' && '-cuda' || '' }}-${{ runner.arch }}-${{ inputs.rosdistro }}-${{ github.sha }}
           restore-keys: |
-            ccache-main${{ inputs.container-suffix }}-${{ runner.arch }}-${{ inputs.rosdistro }}-
+            ccache-main${{ env.BUILD_TYPE_CUDA_STATE == 'cuda' && '-cuda' || '' }}-${{ runner.arch }}-${{ inputs.rosdistro }}-
 
       - name: Limit ccache size
         if: ${{ inputs.pull-ccache || inputs.push-ccache }}
@@ -135,20 +138,10 @@ jobs:
           ccache --zero-stats
         shell: bash
 
-      - name: Export CUDA state as a variable for adding to cache key
-        run: |
-          build_type_cuda_state=nocuda
-          if [[ "${{ inputs.container-suffix }}" == "-cuda" ]]; then
-            build_type_cuda_state=cuda
-          fi
-          echo "BUILD_TYPE_CUDA_STATE=$build_type_cuda_state" >> "${GITHUB_ENV}"
-          echo "::notice::BUILD_TYPE_CUDA_STATE=$build_type_cuda_state"
-        shell: bash
-
       # Placed after "Get self packages" so the CUDA dependencies are not treated as self packages.
       # cspell:ignore libcufft
       - name: Prepare CUDA dependencies
-        if: ${{ inputs.container-suffix == '-cuda' }}
+        if: ${{ env.BUILD_TYPE_CUDA_STATE == 'cuda' }}
         run: |
           # shortcut: cuFFT is not in the image and has no rosdep key; the package name follows the image's CUDA version (13.0).
           apt-get update
@@ -180,11 +173,11 @@ jobs:
         with:
           path: |
             /root/.ccache
-          key: ccache-main${{ inputs.container-suffix }}-${{ runner.arch }}-${{ inputs.rosdistro }}-${{ github.sha }}
+          key: ccache-main${{ env.BUILD_TYPE_CUDA_STATE == 'cuda' && '-cuda' || '' }}-${{ runner.arch }}-${{ inputs.rosdistro }}-${{ github.sha }}
 
       # The runners have no GPU, so the CUDA variant is build-only.
       - name: Test
-        if: ${{ steps.get-self-packages.outputs.self-packages != '' && inputs.container-suffix != '-cuda' }}
+        if: ${{ steps.get-self-packages.outputs.self-packages != '' && env.BUILD_TYPE_CUDA_STATE != 'cuda' }}
         id: test
         uses: autowarefoundation/autoware-github-actions/colcon-test@v1.69.2
         with:

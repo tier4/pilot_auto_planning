@@ -14,13 +14,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # "-cuda" is build-only (see build-and-test-reusable.yaml).
-        container-suffix: ["", -cuda]
+        # The CUDA image is build-only (see build-and-test-reusable.yaml).
+        container:
+          - ghcr.io/autowarefoundation/autoware:universe-devel-jazzy
+          - ghcr.io/autowarefoundation/autoware:universe-devel-cuda-jazzy
     uses: ./.github/workflows/build-and-test-reusable.yaml
     with:
       runner: "['ubuntu-24.04']"
-      container: ghcr.io/autowarefoundation/autoware:universe-devel-jazzy
-      container-suffix: ${{ matrix.container-suffix }}
+      container: ${{ matrix.container }}
       pull-ccache: true
       push-ccache: ${{ github.event_name != 'pull_request' }}
-      concurrency-group: build-and-test-daily${{ matrix.container-suffix }}-${{ github.ref }}-${{ github.run_id }}
+      concurrency-group: build-and-test-daily-${{ matrix.container }}-${{ github.ref }}-${{ github.run_id }}
