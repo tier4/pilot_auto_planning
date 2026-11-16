@@ -12,7 +12,6 @@
     traffic_light_group_msg_timeout_seconds: 0.2
     batch_size: 1
     noise_scale: [0.0]
-    line_string_max_step_m: 5.0
     trajectory_optimization:
       enable: true
       weight_longitudinal: 0.5       # tracking weight along the reference heading [1/m^2]
@@ -67,6 +66,7 @@
       enable: false
       velocity_threshold_mps: 0.3  # stop detection velocity threshold [m/s]
       min_deceleration_duration_sec: 1.0  # required continuous deceleration before fixing [s]
+    turn_indicator_hold_duration_sec: 0.0  # keep left or right on at least this long after it turns on; 0 disables [s]
     planning_factor:
       enable_stop: true
       enable_slowdown: false
