@@ -150,7 +150,7 @@ private:
   bool start_planner_act_{false};
   bool goal_planner_act_{false};
 
-  // lached trajectory generated at previous time step
+  // latched trajectory generated at previous time step
   std::optional<PathPointTrajectory> generated_trajectory_{std::nullopt};
   std::optional<Pose> goal_pose_prev_{std::nullopt};
 
