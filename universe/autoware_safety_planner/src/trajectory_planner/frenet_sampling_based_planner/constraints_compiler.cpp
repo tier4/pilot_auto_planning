@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore undrivable unprojected
 #include "constraints_compiler.hpp"
 
 #include "compiled_constraints_utils.hpp"

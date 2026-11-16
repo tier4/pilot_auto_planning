@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore dkappa
 #ifndef TRAJECTORY_PLANNER__FRENET_SAMPLING_BASED_PLANNER__FRENET_SAMPLING_BASED_PLANNER_HPP_
 #define TRAJECTORY_PLANNER__FRENET_SAMPLING_BASED_PLANNER__FRENET_SAMPLING_BASED_PLANNER_HPP_
 
