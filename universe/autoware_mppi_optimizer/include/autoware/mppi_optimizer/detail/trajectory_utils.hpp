@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore pointwise
 #ifndef AUTOWARE__MPPI_OPTIMIZER__DETAIL__TRAJECTORY_UTILS_HPP_
 #define AUTOWARE__MPPI_OPTIMIZER__DETAIL__TRAJECTORY_UTILS_HPP_
 
@@ -163,8 +164,7 @@ void setInitialEngageVelocity(
  * An inactive profile is an exact no-op.
  */
 void applyActiveVelocityLimitProfile(
-  Trajectory & trajectory, const ActiveVelocityLimitProfile & profile,
-  std::size_t begin_index = 0);
+  Trajectory & trajectory, const ActiveVelocityLimitProfile & profile, std::size_t begin_index = 0);
 
 /**
  * Build a cold nominal from a spatially smoothed curvature fit. Horizon samples advance by the

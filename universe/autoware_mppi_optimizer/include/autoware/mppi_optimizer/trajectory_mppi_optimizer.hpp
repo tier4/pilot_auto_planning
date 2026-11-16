@@ -20,11 +20,11 @@
 #include "autoware/mppi_optimizer/mppi_application_status.hpp"
 #include "autoware/mppi_optimizer/preferred_lane_centerline.hpp"
 
-#include <autoware/avoidance_target_detector/boundary.hpp>
-#include <autoware/avoidance_target_detector/object_filtering.hpp>
 #include <autoware/agnocast_wrapper/macros.hpp>
 #include <autoware/agnocast_wrapper/node.hpp>
 #include <autoware/agnocast_wrapper/polling_subscriber.hpp>
+#include <autoware/avoidance_target_detector/boundary.hpp>
+#include <autoware/avoidance_target_detector/object_filtering.hpp>
 #include <autoware/trajectory_modifier/trajectory_modifier_plugin_base.hpp>
 #include <autoware_mppi_optimizer/trajectory_mppi_optimizer_parameters.hpp>
 #include <autoware_utils_debug/debug_publisher.hpp>
@@ -44,6 +44,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace autoware::mppi_optimizer::plugin
@@ -65,8 +66,8 @@ public:
 
   DebugPublisherAdapter(autoware::agnocast_wrapper::Node * node, const char * ns)
   : agnocast_impl_(
-      std::make_unique<
-        autoware_utils_debug::BasicDebugPublisher<autoware::agnocast_wrapper::Node>>(node, ns))
+      std::make_unique<autoware_utils_debug::BasicDebugPublisher<autoware::agnocast_wrapper::Node>>(
+        node, ns))
   {
   }
 
@@ -99,8 +100,9 @@ public:
 
   DiagnosticsAdapter(autoware::agnocast_wrapper::Node * node, const std::string & name)
   : agnocast_impl_(
-      std::make_unique<autoware_utils_diagnostics::BasicDiagnosticsInterface<
-        autoware::agnocast_wrapper::Node>>(node, name))
+      std::make_unique<
+        autoware_utils_diagnostics::BasicDiagnosticsInterface<autoware::agnocast_wrapper::Node>>(
+        node, name))
   {
   }
 
@@ -142,8 +144,7 @@ public:
   }
 
 private:
-  std::unique_ptr<autoware_utils_diagnostics::BasicDiagnosticsInterface<rclcpp::Node>>
-    rclcpp_impl_;
+  std::unique_ptr<autoware_utils_diagnostics::BasicDiagnosticsInterface<rclcpp::Node>> rclcpp_impl_;
   std::unique_ptr<
     autoware_utils_diagnostics::BasicDiagnosticsInterface<autoware::agnocast_wrapper::Node>>
     agnocast_impl_;

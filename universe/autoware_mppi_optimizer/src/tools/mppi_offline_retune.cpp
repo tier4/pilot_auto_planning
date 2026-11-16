@@ -680,9 +680,6 @@ int run(int argc, char ** argv)
 
     const std::string nominal_path =
       !nominal_csv_override.empty() ? nominal_csv_override : (log_dir + "/" + tag + "_nominal.csv");
-    std::vector<float> nominal_accel;
-    std::vector<float> nominal_steer;
-
     float hist_a0 = 0.0F;
     float hist_s0 = 0.0F;
     float hist_a1 = 0.0F;
@@ -700,6 +697,8 @@ int run(int argc, char ** argv)
     }
     const bool force_nominal = !nominal_csv_override.empty() || !reseed_nominal_from_reference;
     if (force_nominal) {
+      std::vector<float> nominal_accel;
+      std::vector<float> nominal_steer;
       if (!loadMppiDebugNominalCsv(nominal_path, nominal_accel, nominal_steer)) {
         std::cerr << "ERROR: missing warm-start nominal control " << nominal_path
                   << "\n*_nominal.csv is the online u_nom warm-start. Re-log with a build that "
@@ -719,9 +718,9 @@ int run(int argc, char ** argv)
 
     {
       const std::string delay_path = log_dir + "/" + tag + "_delay_buffer.csv";
-      std::vector<float> delay_accel;
-      std::vector<float> delay_steer;
       if (std::filesystem::exists(delay_path)) {
+        std::vector<float> delay_accel;
+        std::vector<float> delay_steer;
         if (loadMppiDebugNominalCsv(delay_path, delay_accel, delay_steer) && !delay_accel.empty()) {
           frame_mppi.setInputDelayBuffer(delay_accel, delay_steer);
         }
