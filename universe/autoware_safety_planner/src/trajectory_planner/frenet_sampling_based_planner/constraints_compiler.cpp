@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore undrivable unprojected
 #include "constraints_compiler.hpp"
 
 #include "compiled_constraints_utils.hpp"
@@ -54,15 +55,15 @@ class Centerline
 public:
   explicit Centerline(const PathPointTrajectory & path)
   {
-    const double length = path.length();
-    if (!(length > 0.0)) {
+    const double path_length = path.length();
+    if (!(path_length > 0.0)) {
       return;
     }
-    const auto n = static_cast<std::size_t>(std::ceil(length / CENTERLINE_SAMPLE_INTERVAL_M));
+    const auto n = static_cast<std::size_t>(std::ceil(path_length / CENTERLINE_SAMPLE_INTERVAL_M));
     s_.reserve(n + 1);
     points_.reserve(n + 1);
     for (std::size_t i = 0; i <= n; ++i) {
-      const double s = std::min(static_cast<double>(i) * CENTERLINE_SAMPLE_INTERVAL_M, length);
+      const double s = std::min(static_cast<double>(i) * CENTERLINE_SAMPLE_INTERVAL_M, path_length);
       if (!s_.empty() && s - s_.back() < S_EPS) {
         continue;
       }
@@ -70,7 +71,7 @@ public:
       s_.push_back(s);
       points_.emplace_back(p.x, p.y);
     }
-    length_ = length;
+    length_ = path_length;
     curvature_ = path.curvature(s_);
   }
 
