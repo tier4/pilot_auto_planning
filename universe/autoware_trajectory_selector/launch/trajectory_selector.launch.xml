@@ -22,7 +22,7 @@
 
   <include file="$(find-pkg-share autoware_agnocast_wrapper)/launch/agnocast_env.launch.xml"/>
 
-  <node pkg="autoware_trajectory_selector" exec="autoware_trajectory_selector_node" name="trajectory_selector_node" output="screen">
+  <node pkg="autoware_trajectory_selector" exec="autoware_trajectory_selector_node" name="trajectory_selector_node" output="both">
     <env name="LD_PRELOAD" value="$(var ld_preload_value)"/>
     <param from="$(var trajectory_selector_param_path)" allow_substs="true"/>
     <param from="$(var trajectory_concatenator_param_path)" allow_substs="true"/>
