@@ -47,7 +47,7 @@ using autoware_utils_geometry::Polygon2d;
 using sensor_msgs::msg::PointCloud2;
 using utils::obstacle_stop::CollisionPoint;
 using utils::obstacle_stop::DebugData;
-using utils::obstacle_stop::ObjectRssState;
+using utils::obstacle_stop::TargetObject;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
@@ -57,9 +57,6 @@ public:
   ObstacleStop() = default;
 
   ProcessingResult process(TrajectoryPoints & traj_points, TrajectoryModifierData & input) override;
-
-  [[nodiscard]] bool is_trajectory_modification_required(
-    const TrajectoryPoints & traj_points, const TrajectoryModifierData & input);
 
   void update_params(const TrajectoryModifierParams & params) override;
 
@@ -82,7 +79,6 @@ private:
   ModifierParams::StoppingConstraints stopping_params_;
 
   std::optional<CollisionPoint> nearest_collision_point_;
-  std::vector<ObjectRssState> object_rss_states_;
 
   DebugData debug_data_;
 
@@ -94,11 +90,11 @@ private:
 
   struct CruiseReport
   {
-    ObjectRssState target;
+    TargetObject target;
     double cruise_velocity{0.0};
 
-    [[nodiscard]] double gap() const { return target.gap; }
-    [[nodiscard]] double target_velocity() const { return target.lon_vel; }
+    [[nodiscard]] double gap() const { return target.rss_state.gap; }
+    [[nodiscard]] double target_velocity() const { return target.rss_state.lon_vel; }
   };
 
   SafetyFactorArray safety_factors_;
@@ -120,7 +116,7 @@ private:
   void reset_cycle();
   void build_trajectory_shape(
     const TrajectoryPoints & traj_points, const TrajectoryModifierData & input);
-  void detect_objects(const TrajectoryPoints & traj_points, const TrajectoryModifierData & input);
+  void detect_objects(const TrajectoryModifierData & input);
   std::optional<CollisionPoint> evaluate_object_collision(const TrajectoryPoints & traj_points);
   std::optional<CollisionPoint> check_pointcloud(
     const TrajectoryPoints & traj_points, const TrajectoryModifierData & input);
