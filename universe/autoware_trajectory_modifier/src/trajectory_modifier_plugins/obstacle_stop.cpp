@@ -301,7 +301,7 @@ ProcessingResult ObstacleStop::process(
   if (!stop_modified && cruise_report_) {
     const auto & report = cruise_report_.value();
     RCLCPP_WARN_THROTTLE(
-      get_node_ptr()->get_logger(), *get_clock(), 1000,
+      get_logger(), *get_clock(), 1000,
       "[TM ObstacleStop] Slowing down to cruise velocity  %f m/s for gap %f m",
       report.cruise_velocity, report.gap());
     add_cruise_planning_factor(report, input.current_odometry->pose.pose);
