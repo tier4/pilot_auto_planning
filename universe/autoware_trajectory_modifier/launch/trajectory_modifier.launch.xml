@@ -36,7 +36,7 @@
 
   <include file="$(find-pkg-share autoware_agnocast_wrapper)/launch/agnocast_env.launch.xml"/>
 
-  <node pkg="autoware_trajectory_modifier" exec="autoware_trajectory_modifier_node" name="trajectory_modifier" output="screen">
+  <node pkg="autoware_trajectory_modifier" exec="autoware_trajectory_modifier_node" name="trajectory_modifier" output="both">
     <env name="LD_LIBRARY_PATH" value="/opt/acados/lib:$(env LD_LIBRARY_PATH)"/>
     <env name="LD_PRELOAD" value="$(var ld_preload_value)"/>
     <!-- Small acados/HPIPM QPs jitter badly with a BLAS thread pool. -->
