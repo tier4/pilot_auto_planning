@@ -81,8 +81,14 @@
               fatal_limit: -6.0
               enable_abandon: true
             object_drac_acceleration:
-              safe_limit: -0.5
-              low_caution_limit: -1.5
+              safe_limit:
+                base: -0.5
+                pedestrian: -0.0
+                bicycle: -0.0
+              low_caution_limit:
+                base: -1.2
+                pedestrian: -0.0
+                bicycle: -0.0
           object_prioritized_object_earlier:
             enable_assessment: true
             ego_drac_acceleration:

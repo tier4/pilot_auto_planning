@@ -81,6 +81,8 @@ protected:
     setPlannerData(planner_data_);
   }
 
+  void TearDown() override { rclcpp::shutdown(); }
+
   rclcpp::NodeOptions get_node_options()
   {
     rclcpp::NodeOptions options;
