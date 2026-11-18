@@ -263,3 +263,4 @@ To download the latest model, simply run the provided setup script:
 ## License
 
 This package is released under the Apache 2.0 License.
+<!-- CI test, do not merge -->
