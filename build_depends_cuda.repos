@@ -1,0 +1,9 @@
+repositories:
+  autoware/autoware_cuda:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_cuda.git
+    version: 1.0.0
+  vendor/mppi_generic_vendor:
+    type: git
+    url: https://github.com/tier4/mppi_generic_vendor.git
+    version: 32aaff5948091dcc428a9ac5ea877f49f7f6d5d6

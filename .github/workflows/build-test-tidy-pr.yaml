@@ -22,3 +22,25 @@ jobs:
     with:
       container: ghcr.io/autowarefoundation/autoware:universe-devel-jazzy
       enable-agnocast: true
+
+  check-if-cuda-packages-changed:
+    runs-on: ubuntu-24.04
+    outputs:
+      cuda: ${{ steps.paths_filter.outputs.cuda }}
+    steps:
+      - uses: dorny/paths-filter@v3.0.4
+        id: paths_filter
+        with:
+          filters: |
+            cuda:
+              - 'universe/autoware_diffusion_planner/**'
+              - 'universe/autoware_ml_planner/**'
+              - 'universe/autoware_mppi_optimizer/**'
+
+  # Runs only when a CUDA package changes: the CUDA image is large, and the other packages are built above.
+  build-and-test-differential-cuda:
+    needs: check-if-cuda-packages-changed
+    uses: ./.github/workflows/build-and-test-differential.yaml
+    with:
+      container: ghcr.io/autowarefoundation/autoware:universe-devel-cuda-jazzy
+      run-condition: ${{ needs.check-if-cuda-packages-changed.outputs.cuda == 'true' }}

@@ -14,7 +14,8 @@ workflows:
         - 'actions/cache@v4.3.0'
         - 'actions/checkout@v4.4.0'
         - 'autowarefoundation/autoware-github-actions@v1.69.2'
-    '.github/workflows/build-test-tidy-pr.yaml': []
+    '.github/workflows/build-test-tidy-pr.yaml':
+        - 'dorny/paths-filter@v3.0.4'
     '.github/workflows/check-build-depends.yaml':
         - 'actions/checkout@v4.4.0'
         - 'autowarefoundation/autoware-github-actions@v1.69.2'
