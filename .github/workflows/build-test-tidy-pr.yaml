@@ -44,3 +44,11 @@ jobs:
     with:
       container: ghcr.io/autowarefoundation/autoware:universe-devel-cuda-jazzy
       run-condition: ${{ needs.check-if-cuda-packages-changed.outputs.cuda == 'true' }}
+
+  build-and-test-differential-cuda-agnocast:
+    needs: check-if-cuda-packages-changed
+    uses: ./.github/workflows/build-and-test-differential.yaml
+    with:
+      container: ghcr.io/autowarefoundation/autoware:universe-devel-cuda-jazzy
+      enable-agnocast: true
+      run-condition: ${{ needs.check-if-cuda-packages-changed.outputs.cuda == 'true' }}
