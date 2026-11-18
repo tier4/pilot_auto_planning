@@ -161,11 +161,12 @@ jobs:
         run: echo "LD_LIBRARY_PATH=$(ls -d "${PWD}"/install/*/lib | paste -sd:)${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> "${GITHUB_ENV}"
         shell: bash
 
+      # The runners have no GPU, so the CUDA variant is build-only.
       - name: Test
         id: test
         env:
           ENABLE_AGNOCAST: "0"
-        if: ${{ steps.get-modified-packages.outputs.modified-packages != '' }}
+        if: ${{ steps.get-modified-packages.outputs.modified-packages != '' && env.BUILD_TYPE_CUDA_STATE != 'cuda' }}
         uses: autowarefoundation/autoware-github-actions/colcon-test@v1.69.2
         with:
           rosdistro: ${{ inputs.rosdistro }}
