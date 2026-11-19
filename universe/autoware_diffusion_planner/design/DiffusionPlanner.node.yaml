@@ -1,0 +1,87 @@
+autoware_system_design_format: 0.3.0
+
+# node information
+name: DiffusionPlanner.node
+
+package:
+  name: autoware_diffusion_planner
+  provider: autoware
+
+launch:
+  plugin: autoware::diffusion_planner::DiffusionPlanner
+  executable: autoware_diffusion_planner_node
+  node_output: both
+
+# interfaces
+subscribers:
+  - name: odometry
+    message_type: nav_msgs/msg/Odometry
+  - name: acceleration
+    message_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: route
+    message_type: autoware_planning_msgs/msg/LaneletRoute
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: traffic_signals
+    message_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+  - name: tracked_objects
+    message_type: autoware_perception_msgs/msg/TrackedObjects
+  - name: vector_map
+    message_type: autoware_map_msgs/msg/LaneletMapBin
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: turn_indicators
+    message_type: autoware_vehicle_msgs/msg/TurnIndicatorsReport
+
+publishers:
+  - name: trajectory
+    message_type: autoware_planning_msgs/msg/Trajectory
+  - name: trajectories
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: predicted_objects
+    message_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: turn_indicators
+    message_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  - name: debug/traffic_signal
+    message_type: autoware_perception_msgs/msg/TrafficLightGroup
+    remap_target: ~/output/debug/traffic_signal
+  - name: planning_factors/diffusion_planner
+    message_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    remap_target: /planning/planning_factors/diffusion_planner
+
+servers:
+  # guidance module switches
+  - name: service/set_start_guidance_enabled
+    message_type: std_srvs/srv/SetBool
+    remap_target: ~/service/set_start_guidance_enabled
+  - name: service/set_stop_guidance_enabled
+    message_type: std_srvs/srv/SetBool
+    remap_target: ~/service/set_stop_guidance_enabled
+  - name: service/set_centerline_guidance_enabled
+    message_type: std_srvs/srv/SetBool
+    remap_target: ~/service/set_centerline_guidance_enabled
+
+# parameters
+param_files:
+  - name: diffusion_planner_param
+    default: $(find-pkg-share autoware_diffusion_planner)/config/diffusion_planner.param.yaml
+  - name: vehicle_info_param
+    default: $(find-pkg-share autoware_vehicle_info_utils)/config/vehicle_info.param.yaml
+
+param_values:
+  - name: build_only
+    type: bool
+    default: false
+
+# processes
+processes:
+  - name: plan_trajectory
+    trigger_conditions:
+      - periodic: 10.0
+    outcomes:
+      - to_output: trajectory
+      - to_output: trajectories
+      - to_output: predicted_objects
+      - to_output: turn_indicators

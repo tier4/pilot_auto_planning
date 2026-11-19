@@ -1,0 +1,50 @@
+autoware_system_design_format: 0.3.0
+
+# node information
+name: TrajectoryGate.node
+
+package:
+  name: autoware_trajectory_gate
+  provider: autoware
+
+launch:
+  plugin: autoware::trajectory_gate::TrajectoryGate
+  executable: trajectory_gate_node
+
+# interfaces
+subscribers:
+  # one input per source name in the config
+  - name: inputs/main/trajectory
+    message_type: autoware_planning_msgs/msg/Trajectory
+    remap_target: ~/inputs/main/trajectory
+
+publishers:
+  - name: trajectory
+    message_type: autoware_planning_msgs/msg/Trajectory
+    remap_target: ~/output/trajectory
+  - name: source/status
+    message_type: tier4_system_msgs/msg/TrajectorySourceStatus
+    remap_target: ~/source/status
+    qos:
+      reliability: reliable
+      durability: transient_local
+
+servers:
+  - name: source/change
+    message_type: tier4_system_msgs/srv/ChangeTrajectorySource
+    remap_target: ~/source/change
+
+# parameters
+param_files:
+  - name: config
+    default: $(find-pkg-share autoware_trajectory_gate)/config/trajectory_gate.param.yaml
+
+param_values: []
+
+# processes
+processes:
+  - name: forward_selected_source
+    trigger_conditions:
+      - on_input: inputs/main/trajectory
+    outcomes:
+      - to_output: trajectory

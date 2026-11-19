@@ -1,0 +1,109 @@
+autoware_system_design_format: 0.3.0
+
+# node information
+name: TrajectoryProcessor.node
+
+package:
+  name: autoware_trajectory_processor
+  provider: autoware
+
+launch:
+  plugin: autoware::trajectory_processor::TrajectoryProcessor
+  executable: autoware_trajectory_processor_node
+  node_output: screen
+
+# interfaces
+subscribers:
+  - name: trajectories
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: odometry
+    message_type: nav_msgs/msg/Odometry
+  - name: acceleration
+    message_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: steering_status
+    message_type: autoware_vehicle_msgs/msg/SteeringReport
+  - name: objects
+    message_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: tracked_objects
+    message_type: autoware_perception_msgs/msg/TrackedObjects
+  - name: pointcloud
+    message_type: sensor_msgs/msg/PointCloud2
+    qos:
+      reliability: best_effort
+  - name: route
+    message_type: autoware_planning_msgs/msg/LaneletRoute
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: traffic_signals
+    message_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+  - name: vector_map
+    message_type: autoware_map_msgs/msg/LaneletMapBin
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: external_velocity_limit_mps
+    message_type: autoware_internal_planning_msgs/msg/VelocityLimit
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: velocity_limit_clear_command
+    message_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
+    qos:
+      reliability: reliable
+      durability: transient_local
+
+publishers:
+  - name: trajectory
+    message_type: autoware_planning_msgs/msg/Trajectory
+  - name: trajectories
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: current_velocity_limit_mps
+    message_type: autoware_internal_planning_msgs/msg/VelocityLimit
+    qos:
+      reliability: reliable
+      durability: transient_local
+
+# parameters
+param_files:
+  - name: trajectory_processor_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/trajectory_processor.param.yaml
+  - name: common_param
+    default: $(find-pkg-share autoware_core_planning)/config/common.param.yaml
+  - name: elastic_band_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/trajectory_smoothing/elastic_band_smoother.param.yaml
+  - name: trajectory_point_fixer_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_point_fixer.param.yaml
+  - name: trajectory_extender_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_extender.param.yaml
+  - name: trajectory_spline_smoother_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_spline_smoother.param.yaml
+  - name: trajectory_qp_smoother_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_qp_smoother.param.yaml
+  - name: trajectory_velocity_optimizer_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_velocity_optimizer.param.yaml
+  - name: trajectory_kinematic_feasibility_enforcer_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_kinematic_feasibility_enforcer.param.yaml
+  - name: trajectory_mpt_optimizer_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_mpt_optimizer.param.yaml
+  - name: trajectory_temporal_mpt_optimizer_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_temporal_mpt_optimizer.param.yaml
+  - name: trajectory_time_sequence_raw_optimizer_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_time_sequence_raw_optimizer.param.yaml
+  - name: vehicle_info_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/empty.param.yaml
+  - name: simulator_model_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/empty.param.yaml
+  - name: mppi_param
+    default: $(find-pkg-share autoware_trajectory_processor)/config/empty.param.yaml
+
+param_values: []
+
+# processes
+processes:
+  - name: process_trajectories
+    trigger_conditions:
+      - on_input: trajectories
+    outcomes:
+      - to_output: trajectory
+      - to_output: trajectories
