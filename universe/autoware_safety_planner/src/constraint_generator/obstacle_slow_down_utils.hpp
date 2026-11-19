@@ -109,7 +109,7 @@ struct SlowDownInterval
 };
 
 // Throws std::invalid_argument on inconsistent parameters
-void validate_parameters(const SlowDownParameters & params);
+void validate_parameters(const SlowDownParameters & p);
 
 // Keeps the per-UUID state across cycles: construct once
 class SlowDownPlanner

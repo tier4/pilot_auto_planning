@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include "autoware/ml_planner/postprocessing/postprocessing_utils.hpp"
 
 #include <rclcpp/time.hpp>

@@ -33,6 +33,16 @@
     "oids",
     "reparenting",
     "gpgsig",
-    "Dslots"
+    "Dslots",
+    "centerlines",
+    "deadband",
+    "ESDF",
+    "overspeed",
+    "pointwise",
+    "radps",
+    "routability",
+    "routably",
+    "substeps",
+    "xtensor"
   ]
 }
