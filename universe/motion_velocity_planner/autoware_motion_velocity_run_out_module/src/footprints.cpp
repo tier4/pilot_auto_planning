@@ -19,6 +19,8 @@
 
 #include <autoware/trajectory_time_overlap/footprints.hpp>
 
+#include <vector>
+
 namespace autoware::motion_velocity_planner::run_out
 {
 TrajectoryCornerFootprint calculate_trajectory_corner_footprint(

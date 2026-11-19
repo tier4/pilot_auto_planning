@@ -427,6 +427,7 @@ double clamp_trajectory_s(
  */
 struct PlanarProjection
 {
+  // cppcheck-suppress unusedStructMember ; filled by the aggregate initialization in project_planar
   double s{0.0};
   double extended_s{0.0};
   double distance{std::numeric_limits<double>::infinity()};
