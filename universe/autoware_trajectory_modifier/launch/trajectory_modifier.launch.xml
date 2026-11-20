@@ -41,6 +41,7 @@
   <node pkg="autoware_trajectory_modifier" exec="autoware_trajectory_modifier_node" name="trajectory_modifier" output="both">
     <env name="LD_LIBRARY_PATH" value="/opt/acados/lib:$(env LD_LIBRARY_PATH)"/>
     <env name="LD_PRELOAD" value="$(var ld_preload_value)"/>
+    <!-- cspell:ignore HPIPM BLAS OPENBLAS -->
     <!-- Small acados/HPIPM QPs jitter badly with a BLAS thread pool. -->
     <env name="OPENBLAS_NUM_THREADS" value="1"/>
     <env name="MKL_NUM_THREADS" value="1"/>

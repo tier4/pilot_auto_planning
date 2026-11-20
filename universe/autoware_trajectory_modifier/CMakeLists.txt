@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project(autoware_trajectory_modifier)
+# cspell:ignore lacados libqp libacados
 
 find_package(autoware_cmake REQUIRED)
 
