@@ -886,3 +886,15 @@ safety_planner:
           the normals of this cycle's reference_path, against a smoothing term of 1; 0 disables
         validation:
           gt_eq<>: [0.0]
+      ego_curvature_policy:
+        type: string
+        default_value: previous_path
+        read_only: true
+        description: >
+          where the curvature the shifted path starts with at the ego is taken from.
+          steering_status: the measured steering tire angle.
+          previous_path: the shifted path of the previous cycle at the ego, so that the path
+          continues the one planned before whatever the steering is doing; the steering_status is
+          used while there is no previous path near the ego
+        validation:
+          one_of<>: [[steering_status, previous_path]]
