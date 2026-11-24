@@ -36,7 +36,7 @@ The selections apply to the optimized prefix only, up to 80 points. Remaining po
 
 ### Obstacle margins
 
-`obstacle_collision_margin_lateral` and `obstacle_safe_margin_lateral` apply to the obstacle's sides (in the obstacle's own box axes). `obstacle_collision_margin_longitudinal` and `obstacle_safe_margin_longitudinal` apply to its front and back, along its heading. A negative longitudinal value (the default) means "same as lateral". See `MPPI_COSTS.md` section 9.1 for the exact zone shape.
+`obstacle_collision_margin_lateral` and `obstacle_safe_margin_lateral` apply to the obstacle's sides (in the obstacle's own box axes). `obstacle_collision_margin_longitudinal` and `obstacle_safe_margin_longitudinal` apply to its front and back, along its heading. A negative longitudinal value (the default) means "same as lateral". Soft cost is 1 at each face's collision boundary and falls to 0 at that face's safe margin (anisotropic ramps). See `MPPI_COSTS.md` section 9.1.
 
 ### Conditional optimization
 

@@ -25,6 +25,7 @@
 namespace
 {
 
+using mppi::cost::detail::anisotropicSoftViolation;
 using mppi::cost::detail::makeObstacleMarginProfile;
 using mppi::cost::detail::resolveLongitudinalMargin;
 
@@ -35,87 +36,63 @@ TEST(ObstacleMarginProfile, NegativeLongitudinalMarginInheritsLateral)
   EXPECT_FLOAT_EQ(resolveLongitudinalMargin(0.3F, 0.8F), 0.8F);
 }
 
-TEST(ObstacleMarginProfile, IsotropicMarginsHaveNoGeometricExtras)
+TEST(ObstacleMarginProfile, CollisionExtrasMatchResolvedMargins)
 {
-  for (const bool inherit : {true, false}) {
-    const auto profile = makeObstacleMarginProfile(
-      0.3F, inherit ? -1.0F : 0.3F, 0.5F, inherit ? -1.0F : 0.5F);
-    // Exactly the previous formulation: the barrier starts at collision + safe, the collision test
-    // inflates only the ego box, and the obstacle boxes are untouched.
-    EXPECT_EQ(profile.barrier_radius, 0.3F + 0.5F);
-    EXPECT_EQ(profile.barrier_extra_length, 0.0F);
-    EXPECT_EQ(profile.barrier_extra_width, 0.0F);
-    EXPECT_EQ(profile.soft_zone_width, 0.5F);
-    EXPECT_EQ(profile.collision_ego_margin, 0.3F);
-    EXPECT_EQ(profile.collision_extra_length, 0.0F);
-    EXPECT_EQ(profile.collision_extra_width, 0.0F);
-    EXPECT_EQ(profile.collision_broad_phase_offset, 0.0F);
-  }
+  const auto isotropic = makeObstacleMarginProfile(0.3F, -1.0F, 0.5F, -1.0F);
+  EXPECT_FLOAT_EQ(isotropic.collision_lon, 0.3F);
+  EXPECT_FLOAT_EQ(isotropic.collision_lat, 0.3F);
+  EXPECT_FLOAT_EQ(isotropic.safe_lon, 0.5F);
+  EXPECT_FLOAT_EQ(isotropic.safe_lat, 0.5F);
+  EXPECT_FLOAT_EQ(isotropic.collision_ego_margin, 0.3F);
+  EXPECT_FLOAT_EQ(isotropic.collision_extra_length, 0.0F);
+  EXPECT_FLOAT_EQ(isotropic.collision_extra_width, 0.0F);
+
+  const auto wider_lon = makeObstacleMarginProfile(0.2F, 0.5F, 0.3F, 0.75F);
+  EXPECT_FLOAT_EQ(wider_lon.collision_ego_margin, 0.2F);
+  EXPECT_FLOAT_EQ(wider_lon.collision_extra_length, 0.3F);
+  EXPECT_FLOAT_EQ(wider_lon.collision_extra_width, 0.0F);
+  EXPECT_FLOAT_EQ(wider_lon.safe_lon, 0.75F);
+  EXPECT_FLOAT_EQ(wider_lon.safe_lat, 0.3F);
 }
 
-TEST(ObstacleMarginProfile, WiderLongitudinalMarginGrowsTheObstacleLength)
+TEST(AnisotropicSoftViolation, FullInsideCollisionBox)
 {
-  // Lateral total 0.5, longitudinal total 1.25.
-  const auto profile = makeObstacleMarginProfile(0.2F, 0.5F, 0.3F, 0.75F);
-  EXPECT_FLOAT_EQ(profile.barrier_radius, 0.5F);
-  EXPECT_FLOAT_EQ(profile.barrier_extra_length, 0.75F);
-  EXPECT_FLOAT_EQ(profile.barrier_extra_width, 0.0F);
-  EXPECT_FLOAT_EQ(profile.soft_zone_width, 0.3F);
-  EXPECT_FLOAT_EQ(profile.collision_ego_margin, 0.2F);
-  EXPECT_FLOAT_EQ(profile.collision_extra_length, 0.3F);
-  EXPECT_FLOAT_EQ(profile.collision_extra_width, 0.0F);
+  // Obstacle half 1x0.5 at origin, yaw 0. Collision 0.2 / 0.2.
+  EXPECT_FLOAT_EQ(
+    anisotropicSoftViolation(0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 0.5F, 0.2F, 0.2F, 0.5F, 0.5F),
+    1.0F);
 }
 
-TEST(ObstacleMarginProfile, WiderLateralMarginGrowsTheObstacleWidth)
+TEST(AnisotropicSoftViolation, ZeroOutsideSoftOuter)
 {
-  const auto profile = makeObstacleMarginProfile(0.5F, 0.2F, 0.75F, 0.3F);
-  EXPECT_FLOAT_EQ(profile.barrier_radius, 0.5F);
-  EXPECT_FLOAT_EQ(profile.barrier_extra_length, 0.0F);
-  EXPECT_FLOAT_EQ(profile.barrier_extra_width, 0.75F);
-  EXPECT_FLOAT_EQ(profile.collision_ego_margin, 0.2F);
-  EXPECT_FLOAT_EQ(profile.collision_extra_length, 0.0F);
-  EXPECT_FLOAT_EQ(profile.collision_extra_width, 0.3F);
+  EXPECT_FLOAT_EQ(
+    anisotropicSoftViolation(3.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 0.5F, 0.2F, 0.2F, 0.5F, 0.5F),
+    0.0F);
 }
 
-TEST(ObstacleMarginProfile, ZonesNeverShrinkTheObstacle)
+TEST(AnisotropicSoftViolation, LinearRampAlongEachAxis)
 {
-  for (const float lateral_collision : {0.0F, 0.2F, 0.6F}) {
-    for (const float longitudinal_collision : {0.0F, 0.2F, 0.6F}) {
-      for (const float lateral_safe : {0.6F, 0.9F}) {
-        for (const float longitudinal_safe : {0.6F, 1.5F}) {
-          const auto profile = makeObstacleMarginProfile(
-            lateral_collision, longitudinal_collision, lateral_safe, longitudinal_safe);
-          EXPECT_GE(profile.barrier_radius, 0.0F);
-          EXPECT_GE(profile.barrier_extra_length, 0.0F);
-          EXPECT_GE(profile.barrier_extra_width, 0.0F);
-          EXPECT_GE(profile.collision_ego_margin, 0.0F);
-          EXPECT_GE(profile.collision_extra_length, 0.0F);
-          EXPECT_GE(profile.collision_extra_width, 0.0F);
-          EXPECT_GE(profile.collision_broad_phase_offset, 0.0F);
-          // Per axis the barrier zone is the total margin and the collision zone the collision
-          // margin, so each axis reproduces its own margin.
-          EXPECT_FLOAT_EQ(
-            profile.barrier_radius + profile.barrier_extra_length,
-            longitudinal_collision + longitudinal_safe);
-          EXPECT_FLOAT_EQ(
-            profile.barrier_radius + profile.barrier_extra_width,
-            lateral_collision + lateral_safe);
-          EXPECT_FLOAT_EQ(
-            profile.collision_ego_margin + profile.collision_extra_length, longitudinal_collision);
-          EXPECT_FLOAT_EQ(
-            profile.collision_ego_margin + profile.collision_extra_width, lateral_collision);
-        }
-      }
-    }
-  }
+  // Collision face at x = 1.2, soft face at x = 1.7 (safe_lon = 0.5). Midpoint -> 0.5.
+  EXPECT_NEAR(
+    anisotropicSoftViolation(1.45F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 0.5F, 0.2F, 0.2F, 0.5F, 0.3F),
+    0.5F, 1.0E-5F);
+  // Lateral: collision face at y = 0.7, soft at y = 1.0 (safe_lat = 0.3). Midpoint -> 0.5.
+  EXPECT_NEAR(
+    anisotropicSoftViolation(0.0F, 0.85F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 0.5F, 0.2F, 0.2F, 0.5F, 0.3F),
+    0.5F, 1.0E-5F);
 }
 
-TEST(ObstacleMarginProfile, BroadPhaseOffsetCoversCollisionZoneLargerThanTheField)
+TEST(AnisotropicSoftViolation, LongerLongitudinalSoftRamp)
 {
-  // Collision zone grows by (0.6, 0) while the barrier field grows by (0, 0): the field's box is
-  // smaller than the collision box by 0.6 m, which the broad phase has to allow for.
-  const auto profile = makeObstacleMarginProfile(0.0F, 0.6F, 1.2F, 0.6F);
-  EXPECT_GT(profile.collision_broad_phase_offset, 0.0F);
+  // Longitudinal safe 1.0, lateral safe 0.2. Same geometric overshoot 0.1 past collision.
+  // Along length: 0.1/1.0 -> violation 0.9. Along width: 0.1/0.2 -> violation 0.5.
+  const float along_length = anisotropicSoftViolation(
+    1.3F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 0.5F, 0.2F, 0.2F, 1.0F, 0.2F);
+  const float along_width = anisotropicSoftViolation(
+    0.0F, 0.8F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 0.5F, 0.2F, 0.2F, 1.0F, 0.2F);
+  EXPECT_NEAR(along_length, 0.9F, 1.0E-5F);
+  EXPECT_NEAR(along_width, 0.5F, 1.0E-5F);
+  EXPECT_GT(along_length, along_width);
 }
 
 }  // namespace

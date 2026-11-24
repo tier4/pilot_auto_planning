@@ -152,12 +152,7 @@ struct alignas(16) FirstOrderDubinsRuntimeData
   float obs_x_[kMaxObstacles][NUM_TIMESTEPS] = {};
   float obs_y_[kMaxObstacles][NUM_TIMESTEPS] = {};
   float obs_yaw_[kMaxObstacles][NUM_TIMESTEPS] = {};
-  /**
-   * Obstacle half extents grown by the barrier zone's lateral/longitudinal extras (see
-   * obstacle_margin_profile.cuh), so the distance field and fallback need no margin knowledge.
-   * Equal to the true half extents for isotropic margins. egoIntersectsObstacleAtStep()
-   * re-derives the collision zone from these.
-   */
+  /** True obstacle half extents (no margin growth). Soft and collision margins are applied at use. */
   float obs_half_length_[kMaxObstacles] = {};
   float obs_half_width_[kMaxObstacles] = {};
   /** True when the obstacle pose is invariant across the supplied horizon. */
@@ -466,6 +461,14 @@ public:
    */
   __host__ __device__ float distanceToClosestObstacle(
     float x, float y, float yaw, int timestep, int * closest_obstacle = nullptr) const;
+
+  /**
+   * Anisotropic soft-obstacle violation in [0, 1] for the ego spine circles: 1 at/inside the
+   * collision-inflated box, 0 at/outside each axis's safe margin. The max over circles and
+   * obstacles is returned.
+   */
+  __host__ __device__ float softViolationToClosestObstacle(
+    float x, float y, float yaw, int timestep) const;
 
   /** Exact inflated-footprint collision; optionally returns the first intersecting segment. */
   __host__ __device__ bool egoIntersectsRoadBorder(

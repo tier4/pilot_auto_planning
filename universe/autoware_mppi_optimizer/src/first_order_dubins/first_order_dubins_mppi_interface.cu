@@ -456,10 +456,9 @@ void applyUserCostParams(
   cost_params.road_border_collision_margin = user.road_border_collision_margin;
   cost_params.obstacle_safe_margin_lateral = user.obstacle_safe_margin_lateral;
   cost_params.obstacle_safe_margin_longitudinal = user.obstacle_safe_margin_longitudinal;
-  // The barrier reaches crash_contact_penalty at the collision boundary of the narrower soft zone
-  // (lateral or longitudinal) and is proportionally steeper at the wider one.
-  cost_params.obstacle_barrier_weight = calc_weight(
-    user.crash_contact_penalty, cost_params.obstacleMarginProfile().soft_zone_width);
+  // Soft violation is normalized to [0, 1] (1 at the collision boundary), so the weight is the
+  // crash penalty itself: cost = penalty * violation^2.
+  cost_params.obstacle_barrier_weight = user.crash_contact_penalty;
   cost_params.road_border_safe_margin = user.road_border_safe_margin;
   cost_params.road_border_barrier_weight =
     calc_weight(user.crash_contact_penalty, user.road_border_safe_margin);
@@ -2693,7 +2692,7 @@ void validateCostMarginsAndNoise(const FirstOrderDubinsMppiCostParams & p)
   };
   if (
     !finite_barrier(p.lateral_boundary_soft_margin) ||
-    !finite_barrier(obstacle_margins.soft_zone_width) ||
+    !std::isfinite(p.crash_contact_penalty) || p.crash_contact_penalty < 0.0F ||
     !finite_barrier(p.road_border_safe_margin)) {
     throw std::invalid_argument(
       "MPPI crash penalty and margins produce a non-finite barrier weight");

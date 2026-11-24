@@ -30,11 +30,9 @@ namespace autoware::mppi_optimizer
 /**
  * Heat value in [0, 100] for one cell, or -1 (unknown) for non-finite clearance.
  *
- * The rollout barrier is quadratic in how far a cell intrudes into the safety margin, so its outer
- * halo is nearly invisible when mapped linearly. sqrt(cost / full_scale_cost) is the (linear)
- * fraction of the full-scale intrusion: 0 at the edge of influence, 1 at the layer's full scale
- * (obstacle: footprint circle touching it; road border / drivable area: footprint center on the
- * line), and saturated at 100 beyond. The raw clearance stays in the snapshot.
+ * sqrt(cost / full_scale_cost) is the linear fraction of the full-scale intrusion. For the obstacle
+ * layer, clearance stores (1 - soft_violation) with unit safety margin, so heat tracks the
+ * anisotropic soft violation directly (100 at the collision boundary, 0 at the soft outer box).
  */
 [[nodiscard]] inline std::int8_t costmapHeat(
   const FirstOrderDubinsMppiCostmapSnapshot & snapshot, const float clearance)

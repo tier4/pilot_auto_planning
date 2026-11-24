@@ -1255,9 +1255,7 @@ protected:
     params.obstacle_collision_margin_longitudinal = collision_longitudinal;
     params.obstacle_safe_margin_lateral = safe_lateral;
     params.obstacle_safe_margin_longitudinal = safe_longitudinal;
-    const auto profile = params.obstacleMarginProfile();
-    params.obstacle_barrier_weight =
-      params.crash_contact_penalty / (profile.soft_zone_width * profile.soft_zone_width);
+    params.obstacle_barrier_weight = params.crash_contact_penalty;
     return params;
   }
 
@@ -1309,36 +1307,30 @@ TEST_F(AnisotropicObstacleMargins, NegativeLongitudinalMarginInheritsLateral)
   }
 }
 
-TEST_F(AnisotropicObstacleMargins, BarrierStartsAtTheMarginOfTheFacingAxis)
+TEST_F(AnisotropicObstacleMargins, SoftCostRampsPerAxisFromCollisionToSafe)
 {
-  // Longitudinal total margin 0.4 m, lateral 0.8 m.
-  const auto params = makeParams(0.1F, 0.2F, 0.7F, 0.2F);
-  const auto isotropic_reference = makeParams(0.1F, -1.0F, 0.7F, -1.0F);
-  const float weight = params.obstacle_barrier_weight;
+  // Ego is a 1x1 box at the origin (spine circle radius ~0.56). Obstacle half 0.2 at various
+  // poses. Longitudinal soft 1.0, lateral soft 0.2; collision 0.1 both ways.
+  const auto params = makeParams(0.1F, 0.1F, 0.2F, 1.0F);
+  const float penalty = params.crash_contact_penalty;
 
-  const auto barrier_cost = [](TestCost & cost) {
+  const auto soft_cost = [](TestCost & cost) {
     float drivable, obstacle, road;
     cost.computeGradualCrashCosts(0, 0, 0, 0, drivable, obstacle, road, nullptr, nullptr);
     return obstacle;
   };
 
-  // Obstacle straight ahead (its back face) and abreast (its side). The plain distance to the
-  // un-grown box comes from the isotropic configuration, whose extras are zero.
-  struct Case
-  {
-    float x;
-    float y;
-    float total_margin;
-  };
-  for (const Case c : {Case{1.0F, 0.0F, 0.4F}, Case{0.0F, 1.0F, 0.8F}}) {
-    auto reference = makeCost(isotropic_reference, c.x, c.y, 0.0F);
-    const float distance = reference->distanceToClosestObstacle(0, 0, 0, 0);
-    auto cost = makeCost(params, c.x, c.y, 0.0F);
-    EXPECT_NEAR(
-      barrier_cost(*cost), computeSmoothBarrierCost(distance, c.total_margin, weight),
-      1.0E-3F * std::max(1.0F, barrier_cost(*cost)))
-      << "obstacle at (" << c.x << ", " << c.y << ")";
-  }
+  // Far away: zero soft cost.
+  EXPECT_FLOAT_EQ(soft_cost(*makeCost(params, 5.0F, 0.0F, 0.0F)), 0.0F);
+
+  // Deep overlap: full penalty.
+  EXPECT_NEAR(soft_cost(*makeCost(params, 0.0F, 0.0F, 0.0F)), penalty, 1.0E-2F * penalty);
+
+  // Along the obstacle length the soft ramp is longer, so the same geometric gap past the
+  // collision boundary keeps more cost than the same gap past a side face.
+  auto ahead = makeCost(params, 1.2F, 0.0F, 0.0F);
+  auto abreast = makeCost(params, 0.0F, 1.2F, 0.0F);
+  EXPECT_GT(soft_cost(*ahead), soft_cost(*abreast));
 }
 
 TEST_F(AnisotropicObstacleMargins, RolloutSafetyFlagAgreesWithTheExactCollisionTest)

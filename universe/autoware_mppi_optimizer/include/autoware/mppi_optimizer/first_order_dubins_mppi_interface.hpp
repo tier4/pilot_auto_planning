@@ -477,23 +477,20 @@ struct FirstOrderDubinsMppiCostmapSnapshot
   bool empty{true};
   float footprint_circle_radius_m{0.0F};
   /**
-   * Distance at which the barrier starts, measured from the obstacle box grown by the
-   * lateral/longitudinal margin extras: min(collision + safe) over both directions. For isotropic
-   * margins this is obstacle_collision_margin_lateral + obstacle_safe_margin_lateral.
+   * Soft-barrier length [m] used by barrierCost() for static layers, or 1.0 when clearance_m
+   * stores (1 - anisotropic soft violation) for the obstacle layer.
    */
   float safety_margin_m{0.0F};
   float barrier_weight{0.0F};
   /**
-   * Barrier intrusion [m] that maps to full heat. 0 means "use safety_margin_m" (obstacle
-   * layer: footprint circle touching the obstacle). Static layers set it to margin + circle
-   * radius because their margin can be zero.
+   * Barrier intrusion [m] that maps to full heat. 0 means "use safety_margin_m". Static layers set
+   * it to margin + circle radius because their margin can be zero. The obstacle layer uses 1.0
+   * with clearance_m = 1 - soft_violation.
    */
   float full_scale_violation_m{0.0F};
   /**
-   * Distance [m] from the cell center to the nearest obstacle box (<0 inside), or to the nearest
-   * road-border / drivable-area segment (unsigned) for the static layers. The obstacle box is
-   * the one grown by the barrier zone's lateral/longitudinal extras (see
-   * obstacle_margin_profile.cuh), which is the true box for isotropic margins.
+   * For the obstacle layer: 1 - anisotropic soft violation (1 outside the soft zone, 0 at/inside
+   * the collision boundary). For static layers: distance [m] to the nearest segment.
    */
   std::vector<float> clearance_m;
 
