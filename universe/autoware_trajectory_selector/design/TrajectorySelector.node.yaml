@@ -57,11 +57,8 @@ publishers:
     message_type: autoware_internal_planning_msgs/msg/ScoredCandidateTrajectories
 
 # parameters
+# selector and concatenator parameters fall back to the defaults of their param/parameter_struct.yaml
 param_files:
-  - name: trajectory_selector_param
-    default: $(find-pkg-share autoware_trajectory_selector)/config/selector.param.yaml
-  - name: trajectory_concatenator_param
-    default: $(find-pkg-share autoware_trajectory_concatenator)/config/concatenator.param.yaml
   - name: trajectory_validator_param
     default: $(find-pkg-share autoware_trajectory_validator)/config/trajectory_validator.param.yaml
   - name: trajectory_ranker_param
