@@ -16,3 +16,4 @@
         deviation_weight: 0.001 # [-] weight on the offset from the centerline, against a smoothing term of 1
         curvature_margin: 0.9 # [-] fraction of the curvature at full steer the shifted path is held within
         stability_weight: 0.0 # [-] weight on the offset from the previous cycle's shifted path, against a smoothing term of 1
+        ego_curvature_policy: "previous_path" # steering_status / previous_path: where the curvature of the shifted path at the ego is taken from
