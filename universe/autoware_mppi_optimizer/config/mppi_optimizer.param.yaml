@@ -141,6 +141,10 @@
 
       # Expensive per-iteration sampled rollout markers.
       enable_iteration_rollout_debug: false
+      # Obstacle cost heatmap (axis-aligned, centered on the reference path) on
+      # ~/debug/mppi/obstacle_costmap (nav_msgs/OccupancyGrid).
+      enable_obstacle_costmap_debug: false
+      obstacle_costmap_time_step: 0
       # Optional offline debug log output.
       enable_debug_trajectory_log: true
       debug_trajectory_log_directory: ""

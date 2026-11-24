@@ -343,6 +343,28 @@ public:
   /** Refresh the debug window after all distance maps for the current control cycle are ready. */
   __host__ void renderDistanceMapTextureDebug();
 
+  /**
+   * Queue an asynchronous copy of one obstacle texture slice into pinned host memory. The copy is
+   * ordered on the rollout stream, so call it after commitDataUpdate() and before
+   * computeControl(); the controller's own synchronization then completes it. The copy is
+   * skipped while the texture has not been rebuilt since the last copy of the same slice.
+   * @return false when no valid obstacle texture is available.
+   */
+  __host__ bool enqueueObstacleCostmap(int time_step);
+
+  /**
+   * Hand out the slice queued by enqueueObstacleCostmap() (once). Coordinates are in the cost's
+   * local frame; frame_id, stamp and ego pose are left to the caller.
+   */
+  __host__ bool collectObstacleCostmap(
+    autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot & out);
+
+  /** Number of device-to-host slice copies issued so far. */
+  [[nodiscard]] std::uint64_t obstacleCostmapCopyCount() const
+  {
+    return obstacle_costmap_copy_count_;
+  }
+
   /** Euclidean position error squared: ||p - ref[t]||^2. */
   __host__ __device__ float computeTrackValue(
     float x, float y, int timestep, const float * theta_c = nullptr) const;
@@ -500,6 +522,7 @@ private:
     bool drivable_area_geometry_changed);
   __host__ void distanceMapStateToDevice();
   __host__ void releaseDistanceMapResources();
+  __host__ void ensureObstacleCostmapResources();
 
   bool preferred_lane_center_geometry_dirty_ = false;
   bool preferred_lane_center_texture_enabled_ = true;
@@ -511,6 +534,19 @@ private:
   bool drivable_area_geometry_dirty_ = false;
   bool nearest_segment_refresh_pending_ = false;
   bool nearest_segment_geometry_dirty_ = false;
+
+  mppi::memory::PinnedHostBuffer<float> obstacle_costmap_host_{};
+  cudaEvent_t obstacle_costmap_done_ = nullptr;
+  bool obstacle_costmap_pending_ = false;
+  bool obstacle_costmap_empty_ = true;
+  int obstacle_costmap_time_step_ = 0;
+  DistanceMapTextureGrid obstacle_costmap_grid_{};
+  /** The pinned buffer holds slice obstacle_costmap_cached_step_ of that texture build. */
+  bool obstacle_costmap_cached_ = false;
+  std::uint64_t obstacle_costmap_cached_build_ = 0;
+  int obstacle_costmap_cached_step_ = 0;
+  std::uint64_t obstacle_costmap_copy_count_ = 0;
+  std::uint64_t obstacle_texture_build_count_ = 0;
 };
 
 template <int NUM_TIMESTEPS>
