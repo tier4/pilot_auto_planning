@@ -1,0 +1,76 @@
+autoware_system_design_format: 0.3.0
+
+# node information
+name: SafetyPlanner.node
+
+package:
+  name: autoware_safety_planner
+  provider: autoware
+
+launch:
+  plugin: autoware::safety_planner::SafetyPlannerNode
+  executable: autoware_safety_planner_node
+  node_output: both
+
+# interfaces
+subscribers:
+  - name: route
+    message_type: autoware_planning_msgs/msg/LaneletRoute
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: vector_map
+    message_type: autoware_map_msgs/msg/LaneletMapBin
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: odometry
+    message_type: nav_msgs/msg/Odometry
+  - name: acceleration
+    message_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: objects
+    message_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: steering
+    message_type: autoware_vehicle_msgs/msg/SteeringReport
+  - name: pointcloud
+    message_type: sensor_msgs/msg/PointCloud2
+    qos:
+      reliability: best_effort
+  - name: external_velocity_limit_mps
+    message_type: autoware_internal_planning_msgs/msg/VelocityLimit
+    qos:
+      reliability: reliable
+      durability: transient_local
+
+publishers:
+  - name: candidate_trajectories
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+
+# parameters
+param_files:
+  - name: safety_planner_param
+    default: $(find-pkg-share autoware_safety_planner)/config/safety_planner.param.yaml
+  - name: vehicle_kinematics_param
+    default: $(find-pkg-share autoware_safety_planner)/config/constraint_generator/vehicle_kinematics.param.yaml
+  - name: external_velocity_limit_param
+    default: $(find-pkg-share autoware_safety_planner)/config/constraint_generator/external_velocity_limit.param.yaml
+  - name: lane_following_drivable_area_param
+    default: $(find-pkg-share autoware_safety_planner)/config/constraint_generator/lane_following_drivable_area.param.yaml
+  - name: obstacle_stop_param
+    default: $(find-pkg-share autoware_safety_planner)/config/constraint_generator/obstacle_stop.param.yaml
+  - name: frenet_sampling_based_planner_param
+    default: $(find-pkg-share autoware_safety_planner)/config/trajectory_planner/frenet_sampling_based_planner.param.yaml
+  - name: reference_path_following_planner_param
+    default: $(find-pkg-share autoware_safety_planner)/config/trajectory_planner/reference_path_following_planner.param.yaml
+  - name: mppi_planner_param
+    default: $(find-pkg-share autoware_safety_planner)/config/trajectory_planner/mppi_planner.param.yaml
+
+param_values: []
+
+# processes
+processes:
+  - name: plan_trajectory
+    trigger_conditions:
+      - periodic: 10.0
+    outcomes:
+      - to_output: candidate_trajectories

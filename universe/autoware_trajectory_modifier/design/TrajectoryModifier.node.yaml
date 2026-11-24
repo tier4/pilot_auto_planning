@@ -1,15 +1,15 @@
 autoware_system_design_format: 0.3.0
 
 # node information
-name: TrajectoryProcessor.node
+name: TrajectoryModifier.node
 
 package:
-  name: autoware_trajectory_processor
+  name: autoware_trajectory_modifier
   provider: autoware
 
 launch:
-  plugin: autoware::trajectory_processor::TrajectoryProcessor
-  executable: autoware_trajectory_processor_node
+  plugin: autoware::trajectory_modifier::TrajectoryModifier
+  executable: autoware_trajectory_modifier_node
   node_output: screen
 
 # interfaces
@@ -66,36 +66,36 @@ publishers:
 
 # parameters
 param_files:
-  - name: trajectory_processor_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/trajectory_processor.param.yaml
+  - name: trajectory_modifier_param
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/trajectory_modifier.param.yaml
   - name: common_param
     default: $(find-pkg-share autoware_core_planning)/config/common.param.yaml
   - name: elastic_band_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/trajectory_smoothing/elastic_band_smoother.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/trajectory_smoothing/elastic_band_smoother.param.yaml
   - name: trajectory_point_fixer_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_point_fixer.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_point_fixer.param.yaml
   - name: trajectory_extender_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_extender.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_extender.param.yaml
   - name: trajectory_spline_smoother_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_spline_smoother.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_spline_smoother.param.yaml
   - name: trajectory_qp_smoother_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_qp_smoother.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_qp_smoother.param.yaml
   - name: trajectory_velocity_optimizer_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_velocity_optimizer.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_velocity_optimizer.param.yaml
   - name: trajectory_kinematic_feasibility_enforcer_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_kinematic_feasibility_enforcer.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_kinematic_feasibility_enforcer.param.yaml
   - name: trajectory_mpt_optimizer_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_mpt_optimizer.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_mpt_optimizer.param.yaml
   - name: trajectory_temporal_mpt_optimizer_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_temporal_mpt_optimizer.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_temporal_mpt_optimizer.param.yaml
   - name: trajectory_time_sequence_raw_optimizer_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/plugins/trajectory_time_sequence_raw_optimizer.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/plugins/trajectory_time_sequence_raw_optimizer.param.yaml
   - name: vehicle_info_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/empty.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/empty.param.yaml
   - name: simulator_model_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/empty.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/empty.param.yaml
   - name: mppi_param
-    default: $(find-pkg-share autoware_trajectory_processor)/config/empty.param.yaml
+    default: $(find-pkg-share autoware_trajectory_modifier)/config/empty.param.yaml
 
 param_values: []
 

@@ -34,16 +34,6 @@ subscribers:
     message_type: sensor_msgs/msg/PointCloud2
     qos:
       reliability: best_effort
-  - name: external_velocity_limit_mps
-    message_type: autoware_internal_planning_msgs/msg/VelocityLimit
-    qos:
-      reliability: reliable
-      durability: transient_local
-  - name: velocity_limit_clear_command
-    message_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
-    qos:
-      reliability: reliable
-      durability: transient_local
 
 publishers:
   - name: candidate_trajectories
