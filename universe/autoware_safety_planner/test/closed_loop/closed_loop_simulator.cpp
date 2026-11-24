@@ -355,7 +355,7 @@ ClosedLoopResult ClosedLoopSimulator::run()
         input_.odometry, input_.acceleration, input_.steering, trajectory,
         std::move(reference_path_xy)});
 
-    // The planner has no fallback: on failure it returns the ego point alone (see mppi_planner),
+    // The planner has no fallback: on failure it returns the ego point alone,
     // which is counted here and bridged with the last complete trajectory rather than treated as
     // a broken one. Before the first complete trajectory the ego has not moved yet and stays put
     if (trajectory.points.size() == 1) {

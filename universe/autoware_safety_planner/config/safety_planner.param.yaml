@@ -42,6 +42,5 @@
       - "autoware::safety_planner::experimental::ObstacleSlowDownConstraintGenerator"
 
     # "autoware::safety_planner::experimental::FrenetSamplingBasedPlanner"
-    # "autoware::safety_planner::experimental::MppiPlanner"
     # "autoware::safety_planner::experimental::ReferencePathFollowingPlanner"
-    trajectory_planner_plugin: "autoware::safety_planner::experimental::FrenetSamplingBasedPlanner"
+    trajectory_planner_plugin: "autoware::safety_planner::experimental::ReferencePathFollowingPlanner"
