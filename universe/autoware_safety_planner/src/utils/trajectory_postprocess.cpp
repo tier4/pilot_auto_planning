@@ -43,8 +43,8 @@ Trajectory set_engage_speed(const Trajectory & trajectory, const double engage_v
   if (length <= MIN_ENGAGE_DIST_M) {
     return result;
   }
-  // A trajectory that never reaches the engage speed is a stop in progress, not a launch (an MPPI
-  // output rolls a little past the stop point at a crawl, so its length alone does not tell)
+  // A trajectory that never reaches the engage speed is a stop in progress, not a launch (an
+  // output may roll a little past the stop point at a crawl, so its length alone does not tell)
   const bool reaches_engage_speed =
     std::any_of(result.points.begin(), result.points.end(), [&](const TrajectoryPoint & point) {
       return point.longitudinal_velocity_mps >= static_cast<float>(engage_velocity_mps);

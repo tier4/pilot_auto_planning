@@ -411,7 +411,7 @@ std::pair<PlannedTrajectory, PlanningFactorData> ReferencePathFollowingPlanner::
     const char * FAILURE =
       lateral_failed ? "lateral QP did not solve" : "velocity QP did not solve";
     RCLCPP_WARN_THROTTLE(logger(), steady_clock(), 5000, "%s", FAILURE);
-    // No fallback on purpose, as the MPPI planner: the failure has to be visible downstream, so
+    // No fallback on purpose: the failure has to be visible downstream, so
     // only the ego point is output and the reason is recorded as a marker. That holds for the
     // lateral QP too, although it stops the ego where the road is narrower than the footprint with
     // its clearance

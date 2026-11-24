@@ -1,5 +1,7 @@
 # Testing
 
+<!-- cspell:ignore DSAFETY -->
+
 ## Overview
 
 `test/closed_loop/` is a lightweight closed-loop simulation that calls `SafetyPlanner::plan` periodically without launching a ROS node.
@@ -51,8 +53,8 @@ source install/setup.bash
 ./build/autoware_safety_planner/test_autoware_safety_planner_closed_loop
 ./build/autoware_safety_planner/test_autoware_safety_planner_closed_loop --gtest_filter='*behavior_normal_route*'
 ./build/autoware_safety_planner/test_autoware_safety_planner_closed_loop --gtest_list_tests
-# run every scenario with another trajectory planner plugin (the MPPI planner needs a GPU)
-SAFETY_PLANNER_TRAJECTORY_PLANNER_PLUGIN=autoware::safety_planner::experimental::MppiPlanner ./build/autoware_safety_planner/test_autoware_safety_planner_closed_loop
+# run every scenario with another trajectory planner plugin
+SAFETY_PLANNER_TRAJECTORY_PLANNER_PLUGIN=autoware::safety_planner::experimental::FrenetSamplingBasedPlanner ./build/autoware_safety_planner/test_autoware_safety_planner_closed_loop
 ```
 
 Plugins are resolved by pluginlib from `plugins.xml` under `install/`, so `source install/setup.bash` is required even when

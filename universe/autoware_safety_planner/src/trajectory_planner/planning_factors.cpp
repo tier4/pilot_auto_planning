@@ -67,7 +67,7 @@ SafetyFactorArray safety_factors_of(const Constraint & constraint, const Planner
   return safety_factors;
 }
 
-//! The same bar stop_target_s / the MPPI reference stop at: the nearest one closed within the
+//! The same bar stop_target_s stops at: the nearest one closed within the
 //! horizon, at the rear-axle arc length where the footprint front touches it
 const StopBarEntry * nearest_stop_bar(
   const PlannerContext & context, const CompiledConstraints & compiled_constraints,
