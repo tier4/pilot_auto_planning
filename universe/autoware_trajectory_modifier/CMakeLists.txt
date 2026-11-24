@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project(autoware_trajectory_modifier)
+# cspell:ignore lacados libqp libacados
 
 find_package(autoware_cmake REQUIRED)
 
@@ -151,6 +152,7 @@ ament_auto_add_library(autoware_trajectory_modifier_plugins SHARED
   src/trajectory_modifier_plugins/traffic_light_stop.cpp
   src/trajectory_modifier_plugins/map_velocity_limits.cpp
   src/trajectory_modifier_plugins/velocity_limits.cpp
+  src/trajectory_modifier_plugins/virtual_traffic_light_stop.cpp
   src/trajectory_modifier_plugins/detection_area_stop.cpp
   src/trajectory_modifier_plugins/model_planning_factor_id.cpp
 )
