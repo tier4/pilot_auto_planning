@@ -611,18 +611,21 @@ void FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAM
     const float * half_width, const int count)
 {
   const int n = std::max(0, std::min(count, kMaxObstacles));
+  // The stored extents include the barrier zone's growth, so a margin change also counts as a
+  // geometry change and rebuilds the distance texture.
+  const auto margins = this->params_.obstacleMarginProfile();
   bool geometry_changed = n != runtimeData().num_obstacles_;
   for (int i = 0; i < n && !geometry_changed; ++i) {
-    geometry_changed = !runtimeData().obs_is_static_[i] || runtimeData().obs_x_[i][0] != x[i] ||
-                       runtimeData().obs_y_[i][0] != y[i] ||
-                       runtimeData().obs_yaw_[i][0] != yaw[i] ||
-                       runtimeData().obs_half_length_[i] != half_length[i] ||
-                       runtimeData().obs_half_width_[i] != half_width[i];
+    geometry_changed =
+      !runtimeData().obs_is_static_[i] || runtimeData().obs_x_[i][0] != x[i] ||
+      runtimeData().obs_y_[i][0] != y[i] || runtimeData().obs_yaw_[i][0] != yaw[i] ||
+      runtimeData().obs_half_length_[i] != half_length[i] + margins.barrier_extra_length ||
+      runtimeData().obs_half_width_[i] != half_width[i] + margins.barrier_extra_width;
   }
   runtimeData().num_obstacles_ = n;
   for (int i = 0; i < n; ++i) {
-    runtimeData().obs_half_length_[i] = half_length[i];
-    runtimeData().obs_half_width_[i] = half_width[i];
+    runtimeData().obs_half_length_[i] = half_length[i] + margins.barrier_extra_length;
+    runtimeData().obs_half_width_[i] = half_width[i] + margins.barrier_extra_width;
     runtimeData().obs_is_static_[i] = true;
     for (int t = 0; t < NUM_TIMESTEPS; ++t) {
       runtimeData().obs_x_[i][t] = x[i];
@@ -673,12 +676,17 @@ void FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAM
   bool geometry_changed = runtimeData().num_obstacles_ != (nt > 0 ? n : 0);
   runtimeData().num_obstacles_ = nt > 0 ? n : 0;
   constexpr float kStaticPoseTolerance = 1.0E-4F;
+  // The stored extents include the barrier zone's growth, so a margin change also counts as a
+  // geometry change and rebuilds the distance texture.
+  const auto margins = this->params_.obstacleMarginProfile();
   for (int i = 0; i < n; ++i) {
     const bool was_static = runtimeData().obs_is_static_[i];
-    bool obstacle_geometry_changed = runtimeData().obs_half_length_[i] != half_length[i] ||
-                                     runtimeData().obs_half_width_[i] != half_width[i];
-    runtimeData().obs_half_length_[i] = half_length[i];
-    runtimeData().obs_half_width_[i] = half_width[i];
+    const float grown_half_length = half_length[i] + margins.barrier_extra_length;
+    const float grown_half_width = half_width[i] + margins.barrier_extra_width;
+    bool obstacle_geometry_changed = runtimeData().obs_half_length_[i] != grown_half_length ||
+                                     runtimeData().obs_half_width_[i] != grown_half_width;
+    runtimeData().obs_half_length_[i] = grown_half_length;
+    runtimeData().obs_half_width_[i] = grown_half_width;
     runtimeData().obs_is_static_[i] = true;
     for (int t = 0; t < nt; ++t) {
       const int idx = i * nt + t;
@@ -1063,9 +1071,14 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
 #endif
   const float ego_cx = x + this->params_.ego_axle_to_box_center * ego_cos;
   const float ego_cy = y + this->params_.ego_axle_to_box_center * ego_sin;
-  const float margin = this->params_.obstacle_collision_margin;
-  const float ego_hl = this->params_.ego_length * 0.5F + margin;
-  const float ego_hw = this->params_.ego_width * 0.5F + margin;
+  // Collision zone: ego inflated by the smaller collision margin, obstacle grown along its own
+  // axes by the remainder. The stored extents already include the barrier zone's growth.
+  const auto margins = this->params_.obstacleMarginProfile();
+  const float ego_hl = this->params_.ego_length * 0.5F + margins.collision_ego_margin;
+  const float ego_hw = this->params_.ego_width * 0.5F + margins.collision_ego_margin;
+  const float obstacle_length_offset =
+    margins.collision_extra_length - margins.barrier_extra_length;
+  const float obstacle_width_offset = margins.collision_extra_width - margins.barrier_extra_width;
   const auto & data = runtimeData();
   const int num_obstacles = mppi::memory::loadReadOnly(&data.num_obstacles_);
 
@@ -1086,8 +1099,8 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
           ego_cx, ego_cy, ego_cos, ego_sin, ego_hl, ego_hw,
           mppi::memory::loadReadOnly(&data.obs_x_[i][t]),
           mppi::memory::loadReadOnly(&data.obs_y_[i][t]), obs_cos, obs_sin,
-          mppi::memory::loadReadOnly(&data.obs_half_length_[i]),
-          mppi::memory::loadReadOnly(&data.obs_half_width_[i]))) {
+          mppi::memory::loadReadOnly(&data.obs_half_length_[i]) + obstacle_length_offset,
+          mppi::memory::loadReadOnly(&data.obs_half_width_[i]) + obstacle_width_offset)) {
       if (intersecting_obstacle != nullptr) *intersecting_obstacle = i;
       return true;
     }
@@ -1403,11 +1416,12 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
           this->params_.drivable_area_barrier_weight);
   obstacle_cost = 0.0F;
   if (this->params_.obstacle_barrier_weight != 0.0F) {
+    // The field is the distance to the obstacle grown by the lateral/longitudinal margin extras,
+    // so the barrier margin is the scalar radius left after that growth.
+    const auto margins = this->params_.obstacleMarginProfile();
     const float obstacle_distance = distanceToClosestObstacle(x, y, yaw, timestep);
     obstacle_cost = computeSmoothBarrierCost(
-      obstacle_distance,
-      this->params_.obstacle_collision_margin + this->params_.obstacle_safe_margin,
-      this->params_.obstacle_barrier_weight);
+      obstacle_distance, margins.barrier_radius, this->params_.obstacle_barrier_weight);
     float resolution = 0.0F;
 #ifdef __CUDA_ARCH__
     if (texture_state_.obstacle_texture_valid_) {
@@ -1417,7 +1431,8 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
     if (
       (safety_violation != nullptr || rollout_status != nullptr) &&
       distanceFieldMayIntersectInflatedRectangle(
-        obstacle_distance, this->params_.obstacle_collision_margin, resolution, x, y)) {
+        obstacle_distance - margins.collision_broad_phase_offset, margins.collision_ego_margin,
+        resolution, x, y)) {
       int intersecting_obstacle = -1;
       const bool collision =
         egoIntersectsObstacleAtStep(x, y, yaw, timestep, &intersecting_obstacle);

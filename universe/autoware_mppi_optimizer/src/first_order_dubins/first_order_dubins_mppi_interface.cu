@@ -451,11 +451,15 @@ void applyUserCostParams(
   cost_params.lateral_acceleration_coeff = user.lateral_acceleration_coeff;
   cost_params.lateral_jerk_coeff = user.lateral_jerk_coeff;
   cost_params.longitudinal_jerk_coeff = user.longitudinal_jerk_coeff;
-  cost_params.obstacle_collision_margin = user.obstacle_collision_margin;
+  cost_params.obstacle_collision_margin_lateral = user.obstacle_collision_margin_lateral;
+  cost_params.obstacle_collision_margin_longitudinal = user.obstacle_collision_margin_longitudinal;
   cost_params.road_border_collision_margin = user.road_border_collision_margin;
-  cost_params.obstacle_safe_margin = user.obstacle_safe_margin;
-  cost_params.obstacle_barrier_weight =
-    calc_weight(user.crash_contact_penalty, user.obstacle_safe_margin);
+  cost_params.obstacle_safe_margin_lateral = user.obstacle_safe_margin_lateral;
+  cost_params.obstacle_safe_margin_longitudinal = user.obstacle_safe_margin_longitudinal;
+  // The barrier reaches crash_contact_penalty at the collision boundary of the narrower soft zone
+  // (lateral or longitudinal) and is proportionally steeper at the wider one.
+  cost_params.obstacle_barrier_weight = calc_weight(
+    user.crash_contact_penalty, cost_params.obstacleMarginProfile().soft_zone_width);
   cost_params.road_border_safe_margin = user.road_border_safe_margin;
   cost_params.road_border_barrier_weight =
     calc_weight(user.crash_contact_penalty, user.road_border_safe_margin);
@@ -1230,7 +1234,7 @@ struct FirstOrderDubinsMppiInterface::Impl
       "restart_cmd_rate_lim=%.2f, restart_cmd_accel_lim=%.2f, "
       "restart_velocity_threshold=%.2f, vel_rate_lim=%.2f, ego=%.2fx%.2f, "
       "axle_to_center=%.2f, "
-      "boundary_threshold=%.2f, obs_margin=%.2f, road_border_margin=%.2f, "
+      "boundary_threshold=%.2f, obs_margin=%.2f/%.2f (lat/lon), road_border_margin=%.2f, "
       "lateral_barrier=%.2f@%.2f, obs_barrier=%.2f@%.2f, road_barrier=%.2f@%.2f, "
       "drive_barrier=%.2f@%.2f, crash_contact_penalty=%.2f)",
       kMppiHorizon, kNumRollouts, user_cost_params_.max_iter, kDt, user_cost_params_.lambda,
@@ -1244,10 +1248,12 @@ struct FirstOrderDubinsMppiInterface::Impl
       vehicle_params.restart_steer_command_acceleration_lim,
       vehicle_params.restart_velocity_threshold_mps, vehicle_params.vel_rate_lim,
       vehicle_params.ego_length, vehicle_params.ego_width, vehicle_params.ego_axle_to_box_center,
-      cost_params.boundary_threshold, cost_params.obstacle_collision_margin,
+      cost_params.boundary_threshold, cost_params.obstacle_collision_margin_lateral,
+      mppi::cost::detail::resolveLongitudinalMargin(
+        cost_params.obstacle_collision_margin_lateral, cost_params.obstacle_collision_margin_longitudinal),
       cost_params.road_border_collision_margin, cost_params.lateral_boundary_barrier_weight,
       cost_params.lateral_boundary_soft_margin, cost_params.obstacle_barrier_weight,
-      cost_params.obstacle_safe_margin, cost_params.road_border_barrier_weight,
+      cost_params.obstacle_safe_margin_lateral, cost_params.road_border_barrier_weight,
       cost_params.road_border_safe_margin, cost_params.drivable_area_barrier_weight,
       cost_params.drivable_area_safe_margin, cost_params.crash_contact_penalty);
   }
@@ -2651,8 +2657,14 @@ void validateCostMarginsAndNoise(const FirstOrderDubinsMppiCostParams & p)
     {{"corner_safe_margin", p.corner_safe_margin},
      {"boundary_threshold", p.boundary_threshold},
      {"lateral_boundary_soft_margin", p.lateral_boundary_soft_margin},
-     {"obstacle_collision_margin", p.obstacle_collision_margin},
-     {"obstacle_safe_margin", p.obstacle_safe_margin},
+     {"obstacle_collision_margin_lateral", p.obstacle_collision_margin_lateral},
+     {"obstacle_safe_margin_lateral", p.obstacle_safe_margin_lateral},
+     {"obstacle_collision_margin_longitudinal",
+      mppi::cost::detail::resolveLongitudinalMargin(
+        p.obstacle_collision_margin_lateral, p.obstacle_collision_margin_longitudinal)},
+     {"obstacle_safe_margin_longitudinal",
+      mppi::cost::detail::resolveLongitudinalMargin(
+        p.obstacle_safe_margin_lateral, p.obstacle_safe_margin_longitudinal)},
      {"road_border_collision_margin", p.road_border_collision_margin},
      {"road_border_safe_margin", p.road_border_safe_margin},
      {"drivable_area_safe_margin", p.drivable_area_safe_margin},
@@ -2663,8 +2675,15 @@ void validateCostMarginsAndNoise(const FirstOrderDubinsMppiCostParams & p)
      {"steer_cmd_std_dev", p.steer_cmd_std_dev},
      {"nominal_curvature_min_chord_length_m", p.nominal_curvature_min_chord_length_m},
      {"nominal_curvature_fit_window_m", p.nominal_curvature_fit_window_m}});
+  const auto obstacle_margins = mppi::cost::detail::makeObstacleMarginProfile(
+    p.obstacle_collision_margin_lateral, p.obstacle_collision_margin_longitudinal, p.obstacle_safe_margin_lateral,
+    p.obstacle_safe_margin_longitudinal);
   if (
-    p.obstacle_safe_margin < p.obstacle_collision_margin ||
+    p.obstacle_safe_margin_lateral < p.obstacle_collision_margin_lateral ||
+    mppi::cost::detail::resolveLongitudinalMargin(
+      p.obstacle_safe_margin_lateral, p.obstacle_safe_margin_longitudinal) <
+      mppi::cost::detail::resolveLongitudinalMargin(
+        p.obstacle_collision_margin_lateral, p.obstacle_collision_margin_longitudinal) ||
     p.road_border_safe_margin < p.road_border_collision_margin) {
     throw std::invalid_argument("MPPI safety margins must be at least their collision margins");
   }
@@ -2673,7 +2692,8 @@ void validateCostMarginsAndNoise(const FirstOrderDubinsMppiCostParams & p)
     return std::isfinite(m * m) && std::isfinite(p.crash_contact_penalty / (m * m));
   };
   if (
-    !finite_barrier(p.lateral_boundary_soft_margin) || !finite_barrier(p.obstacle_safe_margin) ||
+    !finite_barrier(p.lateral_boundary_soft_margin) ||
+    !finite_barrier(obstacle_margins.soft_zone_width) ||
     !finite_barrier(p.road_border_safe_margin)) {
     throw std::invalid_argument(
       "MPPI crash penalty and margins produce a non-finite barrier weight");

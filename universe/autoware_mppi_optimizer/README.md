@@ -34,11 +34,15 @@ Plugin parameters are below `mppi_optimizer`. The `enabled` and `shadow_mode` pa
 
 The selections apply to the optimized prefix only, up to 80 points. Remaining points and skipped or rejected outputs retain their existing behavior, including velocity-limit and steering-hold fallbacks. The debug `optimized_trajectory` uses the selected values; `nominal_control_trajectory` continues to show commands.
 
+### Obstacle margins
+
+`obstacle_collision_margin_lateral` and `obstacle_safe_margin_lateral` apply to the obstacle's sides (in the obstacle's own box axes). `obstacle_collision_margin_longitudinal` and `obstacle_safe_margin_longitudinal` apply to its front and back, along its heading. A negative longitudinal value (the default) means "same as lateral". See `MPPI_COSTS.md` section 9.1 for the exact zone shape.
+
 ### Conditional optimization
 
 Set `optimize_only_on_input_collision: true` to run MPPI only when an enabled input collision condition is met. `trigger_on_road_border_collision` and `trigger_on_static_object_collision` are independent; either match starts optimization. Both triggers default to true, while conditional mode defaults to false to retain the existing behavior. When neither enabled condition matches, the plugin leaves all input points unchanged, including their velocity and steering fields, and publishes a skip diagnostic. With both triggers disabled, every cycle passes through unchanged.
 
-By default, activation uses `obstacle_collision_margin` and `road_border_collision_margin`. Set `use_soft_margins_for_input_collision: true` to also use the soft-cost zones: the object trigger uses `obstacle_collision_margin + obstacle_safe_margin`, and the road-border trigger uses `road_border_collision_margin + road_border_safe_margin`. This changes when MPPI starts; it does not change the MPPI costs or output collision validation.
+By default, activation uses `obstacle_collision_margin_lateral` and `road_border_collision_margin`. Set `use_soft_margins_for_input_collision: true` to also use the soft-cost zones: the object trigger uses `obstacle_collision_margin_lateral + obstacle_safe_margin_lateral` (and, along the obstacle's front and back, the `_longitudinal` counterparts), and the road-border trigger uses `road_border_collision_margin + road_border_safe_margin`. This changes when MPPI starts; it does not change the MPPI costs or output collision validation.
 
 `min_input_collision_activation_duration_s` keeps the conditional gate open for at least that many seconds after the last matching collision check. Every matching cycle refreshes the hold. The default `0.0` disables the hold. The timer uses the node's ROS clock, so paused simulation time pauses the hold; a backward clock jump clears it. Disabling MPPI, missing required inputs, short trajectories, parameter updates, route or map changes, and processing errors also clear it. The hold requests an MPPI optimization, but output validation can still reject the result. The diagnostic `input_collision/activation_source` reports `condition`, `hold`, or `none`; `~/debug/mppi/enabled` continues to report whether an optimized output was applied.
 

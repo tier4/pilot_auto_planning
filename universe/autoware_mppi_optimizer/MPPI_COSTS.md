@@ -381,15 +381,43 @@ oriented obstacle box at stage `k`:
 
 ```text
 L_obstacle = W_obstacle *
-             [obstacle_collision_margin + obstacle_safe_margin - d_obstacle]_+^2
+             [obstacle_collision_margin_lateral + obstacle_safe_margin_lateral - d_obstacle]_+^2
 
-W_obstacle = crash_contact_penalty / max(obstacle_safe_margin, 1e-3)^2
+W_obstacle = crash_contact_penalty / max(obstacle_safe_margin_lateral, 1e-3)^2
 ```
 
 The cost begins outside the circle-based collision envelope, equals `crash_contact_penalty` when
-circle-based clearance reaches `obstacle_collision_margin`, and grows beyond that value during overlap. Static
+circle-based clearance reaches `obstacle_collision_margin_lateral`, and grows beyond that value during overlap. Static
 and time-varying obstacle trajectories both participate. The implementation stores at most 64
 obstacles.
+
+#### Lateral and longitudinal margins
+
+The obstacle margins can differ along the obstacle's own box axes. `obstacle_collision_margin_lateral` and
+`obstacle_safe_margin_lateral` apply to the obstacle's sides (lateral); `obstacle_collision_margin_longitudinal`
+and `obstacle_safe_margin_longitudinal` apply to its front and back, along its heading. A negative
+longitudinal value means "same as lateral", so configurations that set only the lateral margins behave
+exactly as before. The ego margin itself is not directional; only the obstacle's frame is.
+
+A single scalar distance field cannot encode two margins directly, so each zone is a rounded box (the
+obstacle box grown per axis, then offset by a circle radius). With `M_lon = collision_lon + safe_lon`,
+`M_lat = collision_lat + safe_lat` and `r = min(M_lon, M_lat)`:
+
+```text
+barrier zone   obstacle box with half extents (hl + M_lon - r, hw + M_lat - r), offset by r
+L_obstacle   = W_obstacle * [r - d_grown]_+^2
+d_grown      = circle clearance to that grown box
+W_obstacle   = crash_contact_penalty / max(min(safe_lon, safe_lat), 1e-3)^2
+```
+
+The grown box is what the obstacle distance texture stores, so the GPU rollout cost is unchanged apart
+from the scalar margin `r`. The barrier reaches `crash_contact_penalty` at the collision boundary of
+the narrower soft zone and is proportionally steeper at the wider one.
+
+The collision test (rollout safety flag, `validateOptimizedTrajectory()`, and the input collision gate)
+uses the same decomposition: the ego box is inflated by `min(collision_lon, collision_lat)` and the
+obstacle box is grown along its own axes by the remaining `collision_a - min(...)`. For equal margins both
+zones reduce to the previous isotropic formulation exactly. The debug obstacle costmap shows `d_grown`.
 
 The runtime parameter `dynamic_obstacle_horizon_s` limits how far into the future moving
 objects participate in obstacle costs and final OBB collision validation. Its default, `0.0`,
@@ -485,7 +513,7 @@ After optimization and post-processing, `validateOptimizedTrajectory()` rejects 
 trajectory at the first state that has any of these conditions:
 
 - `|e_lat| >= boundary_threshold`;
-- ego OBB (inflated by `obstacle_collision_margin`) overlaps an obstacle OBB;
+- ego OBB (inflated by `obstacle_collision_margin_lateral`) overlaps an obstacle OBB;
 - ego OBB (inflated by `road_border_collision_margin`) intersects a road-border segment;
 - velocity is negative.
 

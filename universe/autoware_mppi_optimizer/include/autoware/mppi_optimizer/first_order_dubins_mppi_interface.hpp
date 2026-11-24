@@ -476,7 +476,11 @@ struct FirstOrderDubinsMppiCostmapSnapshot
   /** True when no obstacle was active; clearance is then the "empty" distance everywhere. */
   bool empty{true};
   float footprint_circle_radius_m{0.0F};
-  /** obstacle_collision_margin + obstacle_safe_margin: distance at which the barrier starts. */
+  /**
+   * Distance at which the barrier starts, measured from the obstacle box grown by the
+   * lateral/longitudinal margin extras: min(collision + safe) over both directions. For isotropic
+   * margins this is obstacle_collision_margin_lateral + obstacle_safe_margin_lateral.
+   */
   float safety_margin_m{0.0F};
   float barrier_weight{0.0F};
   /**
@@ -487,7 +491,9 @@ struct FirstOrderDubinsMppiCostmapSnapshot
   float full_scale_violation_m{0.0F};
   /**
    * Distance [m] from the cell center to the nearest obstacle box (<0 inside), or to the nearest
-   * road-border / drivable-area segment (unsigned) for the static layers.
+   * road-border / drivable-area segment (unsigned) for the static layers. The obstacle box is
+   * the one grown by the barrier zone's lateral/longitudinal extras (see
+   * obstacle_margin_profile.cuh), which is the true box for isotropic margins.
    */
   std::vector<float> clearance_m;
 

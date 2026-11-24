@@ -89,9 +89,16 @@ struct FirstOrderDubinsMppiCostParams
   float lateral_acceleration_coeff{100.0F};
   float lateral_jerk_coeff{10.0F};
   float longitudinal_jerk_coeff{100.0F};
-  float obstacle_collision_margin{0.2F};
+  /**
+   * Obstacle margins are direction dependent, in the obstacle's own box axes. `_lateral` applies
+   * to the obstacle's sides; `_longitudinal` to its front and back. A negative longitudinal margin
+   * means "same as the lateral margin".
+   */
+  float obstacle_collision_margin_lateral{0.2F};
+  float obstacle_collision_margin_longitudinal{-1.0F};
   float road_border_collision_margin{0.1F};
-  float obstacle_safe_margin{0.4F};
+  float obstacle_safe_margin_lateral{0.4F};
+  float obstacle_safe_margin_longitudinal{-1.0F};
   float obstacle_barrier_weight{};
   float road_border_safe_margin{0.2F};
   float road_border_barrier_weight{};

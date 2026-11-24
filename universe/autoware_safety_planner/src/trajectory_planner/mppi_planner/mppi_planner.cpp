@@ -488,8 +488,8 @@ void MppiPlanner::ensure_initialized(
   cost.accel_cmd_noise_exponent = static_cast<float>(p.sampling.accel_cmd_noise_exponent);
   cost.steer_cmd_noise_exponent = static_cast<float>(p.sampling.steer_cmd_noise_exponent);
   cost.boundary_threshold = static_cast<float>(p.boundary_threshold_m);
-  cost.obstacle_collision_margin = static_cast<float>(p.margin.obstacle_collision_m);
-  cost.obstacle_safe_margin = static_cast<float>(p.margin.obstacle_safe_m);
+  cost.obstacle_collision_margin_lateral = static_cast<float>(p.margin.obstacle_collision_m);
+  cost.obstacle_safe_margin_lateral = static_cast<float>(p.margin.obstacle_safe_m);
   cost.road_border_collision_margin = static_cast<float>(p.margin.road_border_collision_m);
   cost.road_border_safe_margin = static_cast<float>(p.margin.road_border_safe_m);
   cost.drivable_area_safe_margin = static_cast<float>(p.margin.drivable_area_safe_m);

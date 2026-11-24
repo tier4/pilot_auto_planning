@@ -306,11 +306,20 @@ trajectory_mppi_optimizer:
     description: Lateral boundary soft margin in meters
     validation: { gt_eq<>: [0.0] }
     read_only: false
-  obstacle_collision_margin:
+  obstacle_collision_margin_lateral:
     type: double
     default_value: 0.2
-    description: Obstacle collision margin in meters
+    description: >-
+      Obstacle collision margin in meters on the obstacle's sides (lateral, in the obstacle's own
+      box axes). See obstacle_collision_margin_longitudinal for its front and back.
     validation: { gt_eq<>: [0.0] }
+    read_only: false
+  obstacle_collision_margin_longitudinal:
+    type: double
+    default_value: -1.0
+    description: >-
+      Obstacle collision margin in meters along the obstacle's heading (its front and back). A
+      negative value means use obstacle_collision_margin_lateral.
     read_only: false
   road_border_collision_margin:
     type: double
@@ -318,11 +327,20 @@ trajectory_mppi_optimizer:
     description: Road border collision margin in meters
     validation: { gt_eq<>: [0.0] }
     read_only: false
-  obstacle_safe_margin:
+  obstacle_safe_margin_lateral:
     type: double
     default_value: 0.4
-    description: Obstacle safety margin in meters
+    description: >-
+      Obstacle safety margin in meters on the obstacle's sides (lateral, in the obstacle's own box
+      axes). See obstacle_safe_margin_longitudinal for its front and back.
     validation: { gt_eq<>: [0.0] }
+    read_only: false
+  obstacle_safe_margin_longitudinal:
+    type: double
+    default_value: -1.0
+    description: >-
+      Obstacle safety margin in meters along the obstacle's heading (its front and back). A
+      negative value means use obstacle_safe_margin_lateral.
     read_only: false
   road_border_safe_margin:
     type: double

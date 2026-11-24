@@ -666,7 +666,9 @@ __host__ bool FirstOrderDubinsBicycleCostImpl<
     0.0F, 0.0F, 1.0F, 0.0F, this->params_.ego_length * 0.5F, this->params_.ego_width * 0.5F,
     circle_x, circle_y, circle_radius);
   out.footprint_circle_radius_m = circle_radius;
-  out.safety_margin_m = this->params_.obstacle_collision_margin + this->params_.obstacle_safe_margin;
+  // The stored field is the distance to the obstacle grown by the lateral/longitudinal margin
+  // extras; what remains of the total margin there is the scalar barrier radius.
+  out.safety_margin_m = this->params_.obstacleMarginProfile().barrier_radius;
   out.barrier_weight = this->params_.obstacle_barrier_weight;
 
   const std::size_t cell_count =

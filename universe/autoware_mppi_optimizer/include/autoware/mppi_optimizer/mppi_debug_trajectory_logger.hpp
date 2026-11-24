@@ -199,9 +199,13 @@ public:
         out << "lateral_acceleration_coeff," << cost.lateral_acceleration_coeff << "\n";
         out << "lateral_jerk_coeff," << cost.lateral_jerk_coeff << "\n";
         out << "longitudinal_jerk_coeff," << cost.longitudinal_jerk_coeff << "\n";
-        out << "obstacle_collision_margin," << cost.obstacle_collision_margin << "\n";
+        out << "obstacle_collision_margin_lateral," << cost.obstacle_collision_margin_lateral << "\n";
+        out << "obstacle_collision_margin_longitudinal,"
+            << cost.obstacle_collision_margin_longitudinal << "\n";
         out << "road_border_collision_margin," << cost.road_border_collision_margin << "\n";
-        out << "obstacle_safe_margin," << cost.obstacle_safe_margin << "\n";
+        out << "obstacle_safe_margin_lateral," << cost.obstacle_safe_margin_lateral << "\n";
+        out << "obstacle_safe_margin_longitudinal," << cost.obstacle_safe_margin_longitudinal
+            << "\n";
         out << "road_border_safe_margin," << cost.road_border_safe_margin << "\n";
         out << "drivable_area_safe_margin," << cost.drivable_area_safe_margin << "\n";
         out << "drivable_area_barrier_weight," << cost.drivable_area_barrier_weight << "\n";

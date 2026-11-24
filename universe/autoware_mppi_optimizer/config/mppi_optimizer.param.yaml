@@ -80,9 +80,13 @@
       # Crash costs
       boundary_threshold: 1.2
       lateral_boundary_soft_margin: 0.7
-      obstacle_collision_margin: 0.2
+      # Obstacle margins in the obstacle's own box axes: _lateral = sides, _longitudinal =
+      # front/back. A negative longitudinal value means "same as lateral".
+      obstacle_collision_margin_lateral: 0.2
+      obstacle_collision_margin_longitudinal: 0.2
       road_border_collision_margin: 0.2
-      obstacle_safe_margin: 0.3
+      obstacle_safe_margin_lateral: 0.3
+      obstacle_safe_margin_longitudinal: 0.3
       road_border_safe_margin: 0.3
       # Hard output validation remains the final collision gate. A 50k soft target strongly
       # separates unsafe rollouts without compressing all normal costs against a 100k outlier.
