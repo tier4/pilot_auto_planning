@@ -29,6 +29,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct DistanceMapTextureTestAccess
@@ -894,6 +895,184 @@ TEST_F(DistanceMapGpuTest, HostAndGpuStateCostsUseTheSameFootprintModel)
   device_result.copyToHost(&gpu_cost, stream());
   CUDA_CHECK(cudaStreamSynchronize(stream()));
   EXPECT_NEAR(gpu_cost, host_cost, 0.1F);
+}
+
+namespace costmap_test
+{
+using autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot;
+
+/** Row-major index of the cell containing (x, y), plus that cell's center. */
+std::pair<std::size_t, std::pair<float, float>> cellAt(
+  const FirstOrderDubinsMppiCostmapSnapshot & costmap, const float x, const float y)
+{
+  const int col =
+    static_cast<int>(std::floor((x - static_cast<float>(costmap.origin_x)) / costmap.resolution_m));
+  const int row =
+    static_cast<int>(std::floor((y - static_cast<float>(costmap.origin_y)) / costmap.resolution_m));
+  EXPECT_GE(col, 0);
+  EXPECT_LT(col, costmap.width);
+  EXPECT_GE(row, 0);
+  EXPECT_LT(row, costmap.height);
+  const float center_x =
+    static_cast<float>(costmap.origin_x) + (static_cast<float>(col) + 0.5F) * costmap.resolution_m;
+  const float center_y =
+    static_cast<float>(costmap.origin_y) + (static_cast<float>(row) + 0.5F) * costmap.resolution_m;
+  return {static_cast<std::size_t>(row * costmap.width + col), {center_x, center_y}};
+}
+}  // namespace costmap_test
+
+TEST_F(DistanceMapGpuTest, ObstacleCostmapIsTheTextureSliceTheRolloutsSample)
+{
+  using costmap_test::cellAt;
+  TestParams params = distanceOnlyParams();
+  params.ego_length = 4.0F;
+  params.ego_width = 2.0F;
+  params.obstacle_collision_margin = 0.2F;
+  params.obstacle_safe_margin = 1.0F;
+  params.obstacle_barrier_weight = 3.0F;
+  cost_->setParams(params);
+  constexpr float obstacle_x = 10.0F;
+  constexpr float obstacle_y = 5.0F;
+  constexpr float obstacle_yaw = 0.0F;
+  constexpr float half_length = 0.5F;
+  constexpr float half_width = 0.5F;
+  cost_->setOrientedBoxObstacles(
+    &obstacle_x, &obstacle_y, &obstacle_yaw, &half_length, &half_width, 1);
+
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(0));
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot costmap;
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_FALSE(cost_->collectObstacleCostmap(costmap)) << "a result must be handed out once";
+
+  ASSERT_TRUE(costmap.valid);
+  EXPECT_FALSE(costmap.empty);
+  ASSERT_GT(costmap.width, 0);
+  ASSERT_GT(costmap.height, 0);
+  ASSERT_EQ(costmap.clearance_m.size(), static_cast<std::size_t>(costmap.width * costmap.height));
+  const float margin = params.obstacle_collision_margin + params.obstacle_safe_margin;
+  EXPECT_NEAR(costmap.safety_margin_m, margin, 1.0E-6F);
+  EXPECT_NEAR(costmap.barrier_weight, params.obstacle_barrier_weight, 1.0E-6F);
+  EXPECT_NEAR(costmap.referenceCost(), params.obstacle_barrier_weight * margin * margin, 1.0E-4F);
+
+  // Values are checked against the analytic box distance at the cell center. Points beside the
+  // box in +x and in +y have different dx/dy, so a transposed grid fails.
+  const auto expected_clearance = [&](const std::pair<float, float> & center) {
+    const float dx = std::max(std::abs(center.first - obstacle_x) - half_length, 0.0F);
+    const float dy = std::max(std::abs(center.second - obstacle_y) - half_width, 0.0F);
+    return std::hypot(dx, dy);
+  };
+  for (const auto & [x, y] :
+       {std::pair{12.0F, 5.0F}, std::pair{10.0F, 8.0F}, std::pair{4.0F, 1.0F}}) {
+    const auto [index, center] = cellAt(costmap, x, y);
+    EXPECT_NEAR(costmap.clearance_m[index], expected_clearance(center), 0.15F) << x << ", " << y;
+  }
+  // On the obstacle: negative signed distance and at least the contact cost.
+  const std::size_t on_obstacle = cellAt(costmap, obstacle_x, obstacle_y).first;
+  EXPECT_LT(costmap.clearance_m[on_obstacle], 0.0F);
+  EXPECT_GE(costmap.barrierCost(costmap.clearance_m[on_obstacle]), costmap.referenceCost());
+
+  // The derived barrier equals the rollout barrier for the same clearance.
+  float circle_x[kEgoSpineCircleCount];
+  float circle_y[kEgoSpineCircleCount];
+  float circle_radius = 0.0F;
+  computeEgoSpineCircles(0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 1.0F, circle_x, circle_y, circle_radius);
+  EXPECT_NEAR(costmap.footprint_circle_radius_m, circle_radius, 1.0E-6F);
+  const std::size_t beside = cellAt(costmap, 10.0F, 7.0F).first;
+  EXPECT_NEAR(
+    costmap.barrierCost(costmap.clearance_m[beside]),
+    computeSmoothBarrierCost(
+      costmap.clearance_m[beside] - circle_radius, margin, params.obstacle_barrier_weight),
+    1.0E-3F);
+}
+
+TEST_F(DistanceMapGpuTest, ObstacleCostmapReturnsTheRequestedTimeSlice)
+{
+  using costmap_test::cellAt;
+  std::array<float, kTestHorizon> x{};
+  std::array<float, kTestHorizon> y{};
+  std::array<float, kTestHorizon> yaw{};
+  for (int timestep = 0; timestep < kTestHorizon; ++timestep) {
+    x[static_cast<std::size_t>(timestep)] = static_cast<float>(timestep);
+  }
+  constexpr float half_length = 0.6F;
+  constexpr float half_width = 0.5F;
+  cost_->setOrientedBoxObstacleTrajectories(
+    x.data(), y.data(), yaw.data(), &half_length, &half_width, 1, kTestHorizon);
+
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot costmap;
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(10));
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_EQ(costmap.time_step_index, 10);
+  const std::size_t at_ten = cellAt(costmap, 10.0F, 0.0F).first;
+  EXPECT_LT(costmap.clearance_m[at_ten], 0.0F);
+
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(0));
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_EQ(costmap.time_step_index, 0);
+  EXPECT_NEAR(costmap.clearance_m[at_ten], 10.0F - half_length, 0.3F);
+
+  // Out-of-range requests are clamped to the last slice.
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(10 * kTestHorizon));
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_EQ(costmap.time_step_index, kTestHorizon - 1);
+}
+
+TEST_F(DistanceMapGpuTest, ObstacleCostmapCopiesOnlyWhenTheTextureWasRebuilt)
+{
+  cost_->setParams(distanceOnlyParams());
+  float obstacle_x = 6.0F;
+  constexpr float obstacle_y = 0.0F;
+  constexpr float obstacle_yaw = 0.0F;
+  constexpr float half_length = 0.5F;
+  constexpr float half_width = 0.5F;
+  cost_->setOrientedBoxObstacles(
+    &obstacle_x, &obstacle_y, &obstacle_yaw, &half_length, &half_width, 1);
+
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot costmap;
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(0));
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  const auto copies = cost_->obstacleCostmapCopyCount();
+  const auto first = costmap.clearance_m;
+
+  // Same obstacles, same slice: the pinned copy is reused.
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(0));
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_EQ(cost_->obstacleCostmapCopyCount(), copies);
+  EXPECT_EQ(costmap.clearance_m, first);
+
+  // A different slice needs a new copy.
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(1));
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_EQ(cost_->obstacleCostmapCopyCount(), copies + 1U);
+
+  // Moving the obstacle rebuilds the texture, so the next request must copy again.
+  obstacle_x = 8.0F;
+  cost_->setOrientedBoxObstacles(
+    &obstacle_x, &obstacle_y, &obstacle_yaw, &half_length, &half_width, 1);
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(1));
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_EQ(cost_->obstacleCostmapCopyCount(), copies + 2U);
+  EXPECT_NE(costmap.clearance_m, first);
+}
+
+TEST_F(DistanceMapGpuTest, ObstacleCostmapIsEmptyWithoutObstaclesAndNeverReadsStaleTexture)
+{
+  constexpr float obstacle_x = 3.0F;
+  constexpr float obstacle_y = 0.0F;
+  constexpr float obstacle_yaw = 0.0F;
+  constexpr float half_length = 0.5F;
+  constexpr float half_width = 0.5F;
+  cost_->setOrientedBoxObstacles(
+    &obstacle_x, &obstacle_y, &obstacle_yaw, &half_length, &half_width, 1);
+  // Clearing leaves the previous texture contents in GPU memory; they must not leak through.
+  cost_->setOrientedBoxObstacles(nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+  ASSERT_TRUE(cost_->enqueueObstacleCostmap(0));
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot costmap;
+  ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
+  EXPECT_TRUE(costmap.empty);
+  EXPECT_TRUE(std::all_of(costmap.clearance_m.begin(), costmap.clearance_m.end(), [](float v) {
+    return v == kEmptyDistance;
+  }));
 }
 
 TEST_F(DistanceMapGpuTest, HeadlessVisualizerFailureLeavesNoLiveVisualizer)

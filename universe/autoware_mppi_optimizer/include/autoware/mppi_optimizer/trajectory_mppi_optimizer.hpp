@@ -34,6 +34,7 @@
 
 #include <autoware_internal_planning_msgs/msg/velocity_limit.hpp>
 #include <autoware_planning_msgs/msg/trajectory.hpp>
+#include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/header.hpp>
@@ -261,6 +262,7 @@ private:
   PublisherHandle<Trajectory> velocity_limit_trajectory_pub_;
   PublisherHandle<MarkerArray> markers_pub_;
   PublisherHandle<MarkerArray> rollouts_pub_;
+  PublisherHandle<nav_msgs::msg::OccupancyGrid> obstacle_costmap_pub_;
   PublisherHandle<std_msgs::msg::Bool> enabled_pub_;
   std::unique_ptr<DebugPublisherAdapter> debug_publisher_;
   std::unique_ptr<DiagnosticsAdapter> cost_diagnostics_;
@@ -268,6 +270,9 @@ private:
   std::optional<FirstOrderDubinsMppiDebug> pending_debug_;
   MarkerArray pending_markers_;
   MarkerArray pending_rollouts_;
+  /** Moved out of the result; converted to a heatmap only when debug data is published. */
+  mutable FirstOrderDubinsMppiCostmapSnapshot pending_costmap_;
+  double pending_costmap_z_{0.0};
   std_msgs::msg::Header pending_debug_header_;
   mutable bool debug_pending_{false};
 };
