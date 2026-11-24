@@ -30,12 +30,13 @@ namespace autoware::mppi_optimizer
 /**
  * Heat value in [0, 100] for one cell, or -1 (unknown) for non-finite clearance.
  *
- * The rollout obstacle barrier is quadratic in how far a cell intrudes into the safety margin, so
- * its outer halo is nearly invisible when mapped linearly. sqrt(cost / contact_cost) is the
- * (linear) fraction of the margin that is intruded: 0 at the edge of influence, 1 at exact
- * contact, and saturated at 100 inside an obstacle. The raw clearance stays in the snapshot.
+ * The rollout barrier is quadratic in how far a cell intrudes into the safety margin, so its outer
+ * halo is nearly invisible when mapped linearly. sqrt(cost / full_scale_cost) is the (linear)
+ * fraction of the full-scale intrusion: 0 at the edge of influence, 1 at the layer's full scale
+ * (obstacle: footprint circle touching it; road border / drivable area: footprint center on the
+ * line), and saturated at 100 beyond. The raw clearance stays in the snapshot.
  */
-[[nodiscard]] inline std::int8_t obstacleCostmapHeat(
+[[nodiscard]] inline std::int8_t costmapHeat(
   const FirstOrderDubinsMppiCostmapSnapshot & snapshot, const float clearance)
 {
   if (!std::isfinite(clearance)) {
@@ -51,14 +52,16 @@ namespace autoware::mppi_optimizer
 }
 
 /**
- * Convert the obstacle distance slice into an OccupancyGrid for RViz's Map display (use the
- * "costmap" color scheme for a heatmap). The grid is axis-aligned in the odometry frame (identity
- * orientation) and covers the obstacle texture, which is centered on the reference path rather
- * than on base_link, so it is positioned with the origin carried by the snapshot.
+ * Convert a distance layer (obstacle slice, road border or drivable area) into an OccupancyGrid for
+ * RViz's Map display. Use the "costmap" color scheme for a heatmap (0 is transparent, then blue to
+ * red) and the display's Alpha slider to make the overlay translucent. The grid is axis-aligned in
+ * the odometry frame (identity orientation) and covers its texture, which is centered on the
+ * reference path rather than on base_link, so it is positioned with the origin carried by the
+ * snapshot.
  *
  * @param z Height [m] of the grid plane in the odometry frame.
  */
-[[nodiscard]] inline nav_msgs::msg::OccupancyGrid makeObstacleCostmapGrid(
+[[nodiscard]] inline nav_msgs::msg::OccupancyGrid makeCostmapGrid(
   const FirstOrderDubinsMppiCostmapSnapshot & snapshot, const double z)
 {
   nav_msgs::msg::OccupancyGrid grid;
@@ -77,7 +80,7 @@ namespace autoware::mppi_optimizer
   grid.data.assign(cell_count, static_cast<std::int8_t>(-1));
   const std::size_t available = std::min(cell_count, snapshot.clearance_m.size());
   for (std::size_t index = 0; index < available; ++index) {
-    grid.data[index] = obstacleCostmapHeat(snapshot, snapshot.clearance_m[index]);
+    grid.data[index] = costmapHeat(snapshot, snapshot.clearance_m[index]);
   }
   return grid;
 }

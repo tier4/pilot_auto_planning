@@ -188,7 +188,7 @@ protected:
     interface_->setCostParams(cost_params);
     FirstOrderDubinsMppiRuntimeOptions options;
     options.enable_debug_trajectory_log = false;
-    options.enable_distance_map_texture_debug = false;
+    options.enable_static_costmap_debug = false;
     options.enable_iteration_rollout_debug = false;
     options.force_cold_start_each_step = false;
     options.use_last_control_as_nominal = false;

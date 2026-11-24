@@ -232,43 +232,6 @@ __global__ void generateObstacleDistanceMapKernel(
 }  // namespace
 
 template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
-__host__ void FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
-  setDistanceMapTextureDebugEnabled(const bool enable)
-{
-  // Store the preference without creating a CUDA/GL context during CPU configuration.
-  distance_map_texture_debug_enabled_ = enable;
-  const bool visualizer_was_enabled = this->texture_state_.distance_map_visualizer_ != nullptr;
-  configureDistanceMapTextureVisualizer(
-    this->texture_state_.distance_map_visualizer_, enable && this->GPUMemStatus_,
-    this->texture_state_.kStaticDistanceMapWidth, this->texture_state_.kStaticDistanceMapHeight,
-    this->texture_state_.kObstacleDistanceMapWidth, this->texture_state_.kObstacleDistanceMapHeight,
-    NUM_TIMESTEPS);
-  if (
-    enable && !visualizer_was_enabled && this->texture_state_.distance_map_visualizer_ != nullptr) {
-    this->texture_state_.static_distance_visualization_dirty_ = true;
-  }
-}
-
-template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
-__host__ void FirstOrderDubinsBicycleCostImpl<
-  CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::renderDistanceMapTextureDebug()
-{
-  const bool rendered = renderDistanceMapTextureVisualizer(
-    this->texture_state_.distance_map_visualizer_, this->texture_state_.static_distance_texture_,
-    this->texture_state_.obstacle_distance_texture_,
-    this->texture_state_.road_border_texture_valid_,
-    this->texture_state_.drivable_area_texture_valid_, this->texture_state_.obstacle_texture_valid_,
-    this->texture_state_.obstacle_texture_has_obstacles_, this->params_.road_border_safe_margin,
-    this->params_.drivable_area_safe_margin, this->params_.obstacle_safe_margin,
-    this->texture_state_.static_distance_map_grid_.resolution,
-    this->texture_state_.obstacle_distance_map_grid_.resolution, this->stream_,
-    this->texture_state_.static_distance_visualization_dirty_);
-  if (rendered) {
-    this->texture_state_.static_distance_visualization_dirty_ = false;
-  }
-}
-
-template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
 __host__ bool FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
   updateDistanceMapGrid(
     DistanceMapTextureGrid & grid, const int width, const int height, const float resolution)
@@ -566,7 +529,7 @@ __host__ void FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, 
     this->cost_d_, this->texture_state_.static_distance_surface_,
     this->texture_state_.static_distance_map_grid_, update_road_border, update_drivable_area);
   HANDLE_ERROR(cudaGetLastError());
-  this->texture_state_.static_distance_visualization_dirty_ = true;
+  ++static_texture_build_count_;
   this->texture_state_.road_border_texture_valid_ =
     this->texture_state_.road_border_texture_valid_ || update_road_border;
   this->texture_state_.drivable_area_texture_valid_ =
@@ -722,6 +685,128 @@ __host__ bool FirstOrderDubinsBicycleCostImpl<
 }
 
 template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ void FirstOrderDubinsBicycleCostImpl<
+  CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::ensureStaticCostmapResources()
+{
+  const std::size_t value_count =
+    2U * static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapWidth) *
+    static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapHeight);
+  if (static_costmap_host_.size() != value_count) {
+    static_costmap_host_.resize(value_count);
+    static_costmap_cached_ = false;
+  }
+  if (static_costmap_done_ == nullptr) {
+    HANDLE_ERROR(cudaEventCreateWithFlags(&static_costmap_done_, cudaEventDisableTiming));
+  }
+}
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ bool FirstOrderDubinsBicycleCostImpl<
+  CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::enqueueStaticCostmaps()
+{
+  static_costmap_pending_ = false;
+  const auto & texture_grid = this->texture_state_.static_distance_map_grid_;
+  if (
+    !this->GPUMemStatus_ || this->texture_state_.static_distance_array_ == nullptr ||
+    texture_grid.width <= 0 || texture_grid.height <= 0 ||
+    (!this->texture_state_.road_border_texture_valid_ &&
+     !this->texture_state_.drivable_area_texture_valid_)) {
+    return false;
+  }
+  static_costmap_grid_ = texture_grid;
+  static_costmap_road_border_valid_ = this->texture_state_.road_border_texture_valid_;
+  static_costmap_drivable_area_valid_ = this->texture_state_.drivable_area_texture_valid_;
+  static_costmap_pending_ = true;
+
+  ensureStaticCostmapResources();
+  // The static texture is the optimizer's own distance field and is only rebuilt when the map
+  // geometry or its grid change. Re-copy it only then; otherwise the pinned copy is still exact.
+  if (static_costmap_cached_ && static_costmap_cached_build_ == static_texture_build_count_) {
+    return true;
+  }
+  mppi::instrumentation::ScopedNvtxRange range(
+    "MPPI/static_costmap_copy", mppi::instrumentation::NvtxColor::DATA_TRANSFER);
+  cudaMemcpy3DParms copy{};
+  copy.srcArray = this->texture_state_.static_distance_array_;
+  copy.dstPtr = make_cudaPitchedPtr(
+    static_costmap_host_.data(), static_cast<std::size_t>(texture_grid.width) * sizeof(float2),
+    static_cast<std::size_t>(texture_grid.width), static_cast<std::size_t>(texture_grid.height));
+  copy.extent = make_cudaExtent(
+    static_cast<std::size_t>(texture_grid.width), static_cast<std::size_t>(texture_grid.height), 1);
+  copy.kind = cudaMemcpyDeviceToHost;
+  HANDLE_ERROR(cudaMemcpy3DAsync(&copy, this->stream_));
+  HANDLE_ERROR(cudaEventRecord(static_costmap_done_, this->stream_));
+  static_costmap_cached_ = true;
+  static_costmap_cached_build_ = static_texture_build_count_;
+  ++static_costmap_copy_count_;
+  return true;
+}
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ bool FirstOrderDubinsBicycleCostImpl<
+  CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::collectStaticCostmaps(
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot & road_border,
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot & drivable_area)
+{
+  if (!static_costmap_pending_) {
+    road_border.valid = false;
+    drivable_area.valid = false;
+    return false;
+  }
+  static_costmap_pending_ = false;
+  const auto & grid = static_costmap_grid_;
+  const std::size_t cell_count = static_cast<std::size_t>(std::max(grid.width, 0)) *
+                                 static_cast<std::size_t>(std::max(grid.height, 0));
+
+  // Same footprint model as distanceToRoadBorder()/distanceToDrivableArea(): the circle union's
+  // radius is removed from the field, then the barrier is applied to the remaining clearance.
+  float circle_x[kEgoSpineCircleCount];
+  float circle_y[kEgoSpineCircleCount];
+  float circle_radius = 0.0F;
+  computeEgoSpineCircles(
+    0.0F, 0.0F, 1.0F, 0.0F, this->params_.ego_length * 0.5F, this->params_.ego_width * 0.5F,
+    circle_x, circle_y, circle_radius);
+
+  const auto fill_metadata = [&](
+                               autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot & out,
+                               const float margin, const float weight, const bool channel_valid) {
+    out.width = grid.width;
+    out.height = grid.height;
+    out.resolution_m = grid.resolution;
+    out.origin_x = grid.origin_x;
+    out.origin_y = grid.origin_y;
+    out.time_step_index = 0;
+    out.empty = !channel_valid;
+    out.footprint_circle_radius_m = circle_radius;
+    out.safety_margin_m = margin;
+    out.barrier_weight = weight;
+    // Full scale (heat 100) = footprint center on the line, since the margin itself can be zero.
+    out.full_scale_violation_m = margin + circle_radius;
+    out.clearance_m.assign(cell_count, kDistanceMapEmptyDistance);
+  };
+  fill_metadata(
+    road_border,
+    this->params_.road_border_collision_margin + this->params_.road_border_safe_margin,
+    this->params_.road_border_barrier_weight, static_costmap_road_border_valid_);
+  fill_metadata(
+    drivable_area, this->params_.drivable_area_safe_margin,
+    this->params_.drivable_area_barrier_weight, static_costmap_drivable_area_valid_);
+
+  if (!road_border.empty || !drivable_area.empty) {
+    // Wait for the copy (normally already complete). A cached copy has nothing new to wait for.
+    HANDLE_ERROR(cudaEventSynchronize(static_costmap_done_));
+    const float * interleaved = static_costmap_host_.data();
+    for (std::size_t cell = 0; cell < cell_count; ++cell) {
+      if (!road_border.empty) road_border.clearance_m[cell] = interleaved[2U * cell];
+      if (!drivable_area.empty) drivable_area.clearance_m[cell] = interleaved[2U * cell + 1U];
+    }
+  }
+  road_border.valid = true;
+  drivable_area.valid = true;
+  return true;
+}
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
 __host__ void FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
   refreshNearestSegmentTexture(const bool geometry_changed)
 {
@@ -855,7 +940,8 @@ __host__ void FirstOrderDubinsBicycleCostImpl<
     this->texture_state_.obstacle_distance_array_ == nullptr &&
     this->texture_state_.preferred_lane_center_array_ == nullptr &&
     this->texture_state_.nearest_segment_array_ == nullptr && obstacle_costmap_done_ == nullptr &&
-    obstacle_costmap_host_.size() == 0U) {
+    obstacle_costmap_host_.size() == 0U && static_costmap_done_ == nullptr &&
+    static_costmap_host_.size() == 0U) {
     return;
   }
 
@@ -867,6 +953,13 @@ __host__ void FirstOrderDubinsBicycleCostImpl<
   obstacle_costmap_host_.resetNoThrow();
   obstacle_costmap_pending_ = false;
   obstacle_costmap_cached_ = false;
+  if (static_costmap_done_ != nullptr) {
+    gpuAssert(cudaEventDestroy(static_costmap_done_), __FILE__, __LINE__, false);
+    static_costmap_done_ = nullptr;
+  }
+  static_costmap_host_.resetNoThrow();
+  static_costmap_pending_ = false;
+  static_costmap_cached_ = false;
   if (this->texture_state_.static_distance_surface_ != 0) {
     gpuAssert(
       cudaDestroySurfaceObject(this->texture_state_.static_distance_surface_), __FILE__, __LINE__,

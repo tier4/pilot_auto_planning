@@ -26,8 +26,8 @@ struct FirstOrderDubinsMppiRuntimeOptions
   bool enable_debug_trajectory_log{false};
   /** Empty -> process current working directory. */
   std::string debug_trajectory_log_directory;
-  /** Open the zero-copy CUDA-OpenGL distance-map texture debug window. */
-  bool enable_distance_map_texture_debug{false};
+  /** Return the road-border and drivable-area distance fields as RViz costmap layers. */
+  bool enable_static_costmap_debug{false};
   /**
    * Copy one slice of the obstacle distance texture (already built for the rollouts) to the host
    * and return it in the optimization result. The copy is queued on the rollout stream and read

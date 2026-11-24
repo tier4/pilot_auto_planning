@@ -373,7 +373,7 @@ TEST(FirstOrderDubinsMppiInterface, CpuConfigurationAndMoveDoNotRequireCuda)
   first.setVehicleParams(FirstOrderDubinsMppiVehicleParams{});
   first.setCostParams(FirstOrderDubinsMppiCostParams{});
   FirstOrderDubinsMppiRuntimeOptions options;
-  options.enable_distance_map_texture_debug = true;
+  options.enable_static_costmap_debug = true;
   first.setRuntimeOptions(options);
   FirstOrderDubinsMppiInterface second;
   second = std::move(first);

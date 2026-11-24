@@ -64,22 +64,14 @@ is filtered from the pre-candidate history; an unfiltered fallback, skipped opti
 invalidates history so resumed filtering starts from measured steering. Turn smoothing introduces
 response lag, so assess tracking and clearance together with steering continuity when tuning alpha.
 
-## Live distance-texture visualization
-
-Set `enable_distance_map_texture_debug: true` under `mppi_optimizer` to open the CUDA-OpenGL
-distance-map viewer. It displays road-border, drivable-boundary, and dynamic-obstacle ESDF panels.
-Drag the slider below the obstacle panel, or use the arrow/Home/End keys, to select its horizon
-timestep. Red is at or inside the boundary, green is at or beyond the configured safe margin, and
-gray means that texture channel is not valid yet. The viewer requires a graphical display; it is
-disabled by default and closing its window stops its updates.
-
-## Obstacle costmap heatmap in RViz
+## Costmap heatmaps in RViz
 
 Set `enable_obstacle_costmap_debug: true` under `mppi_optimizer` to publish the obstacle cost field
 that the rollouts see as a `nav_msgs/OccupancyGrid` on `~/debug/mppi/obstacle_costmap`. In RViz add
-a **Map** display on that topic and set its color scheme to `costmap`. The heatmap only exists on
-cycles where MPPI actually optimizes (`enabled: true`, and with `optimize_only_on_input_collision`
-only while a collision trigger is active); otherwise a single unknown cell is published.
+a **Map** display on that topic, set its **Color Scheme** to `costmap` (0 is transparent, then blue
+to red) and lower **Alpha** for a translucent overlay. The heatmap only exists on cycles where MPPI
+actually optimizes (`enabled: true`, and with `optimize_only_on_input_collision` only while a
+collision trigger is active); otherwise a single transparent cell is published.
 
 - **Frame.** The grid is a direct copy of the obstacle distance texture the rollouts sample
   (512 x 512 at 0.30 m, about 153 m square), so no cost is recomputed. It is axis-aligned in the
@@ -93,6 +85,14 @@ only while a collision trigger is active); otherwise a single unknown cell is pu
   quadratic barrier's outer halo visible.
 - **Time slice.** `obstacle_costmap_time_step` selects the texture slice (post-step index, 0 is
   `dt` ahead; moving objects advance with it).
+- **Static layers.** Set `enable_static_costmap_debug: true` to also publish the road-border
+  (`~/debug/mppi/road_border_costmap`) and drivable-area (`~/debug/mppi/drivable_area_costmap`)
+  distance fields the same way (one 1024 x 1024 grid at 0.15 m, about 154 m square, copied in one
+  go and only when the static texture is rebuilt), each with its own **Map** display. Their heat
+  is the barrier intrusion normalized so that 100 means the ego footprint center is on the line,
+  because the drivable-area safe margin can be zero. The three grids sit 2 cm apart in height so
+  they never z-fight. Everything stays on the CUDA side; there is no OpenGL or display
+  requirement.
 - **Cost.** One slice (about 1 MB) is copied asynchronously into pinned host memory on the rollout
   stream before `computeControl()`, whose own synchronization completes it, so no extra stream sync
   is added. The copy is skipped while the texture is not rebuilt, and the heatmap conversion is

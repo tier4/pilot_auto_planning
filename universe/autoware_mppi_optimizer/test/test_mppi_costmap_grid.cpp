@@ -55,7 +55,7 @@ TEST(MppiCostmapGrid, BarrierCostMatchesTheRolloutBarrier)
 
 TEST(MppiCostmapGrid, GridIsAxisAlignedAtTheSnapshotOrigin)
 {
-  const auto message = makeObstacleCostmapGrid(makeSnapshot(), 1.5);
+  const auto message = makeCostmapGrid(makeSnapshot(), 1.5);
   EXPECT_DOUBLE_EQ(message.info.origin.position.x, 100.0);
   EXPECT_DOUBLE_EQ(message.info.origin.position.y, -20.0);
   EXPECT_DOUBLE_EQ(message.info.origin.position.z, 1.5);
@@ -65,6 +65,7 @@ TEST(MppiCostmapGrid, GridIsAxisAlignedAtTheSnapshotOrigin)
   EXPECT_EQ(message.info.height, 2U);
   EXPECT_FLOAT_EQ(message.info.resolution, 0.5F);
   EXPECT_EQ(message.header.frame_id, "map");
+  EXPECT_EQ(message.data.size(), 8U);
 }
 
 TEST(MppiCostmapGrid, HeatSaturatesAtContactAndMarksNonFiniteCellsUnknown)
@@ -75,13 +76,32 @@ TEST(MppiCostmapGrid, HeatSaturatesAtContactAndMarksNonFiniteCellsUnknown)
   snapshot.clearance_m[2] = 1.0F;   // circle touching the obstacle
   snapshot.clearance_m[3] = -4.0F;  // deep inside an obstacle
   snapshot.clearance_m[4] = std::numeric_limits<float>::quiet_NaN();
-  const auto message = makeObstacleCostmapGrid(snapshot, 0.0);
+  const auto message = makeCostmapGrid(snapshot, 0.0);
   ASSERT_EQ(message.data.size(), 8U);
-  EXPECT_EQ(message.data[0], 0);
+  EXPECT_EQ(message.data[0], 0);  // transparent in RViz's costmap scheme
   EXPECT_EQ(message.data[1], 50);
   EXPECT_EQ(message.data[2], 100);
   EXPECT_EQ(message.data[3], 100);
   EXPECT_EQ(message.data[4], -1);
+}
+
+TEST(MppiCostmapGrid, FullScaleViolationSetsTheHeatScaleEvenWithAZeroMargin)
+{
+  auto snapshot = makeSnapshot();
+  // Static layer with a zero margin: only the footprint radius (1 m) can intrude.
+  snapshot.safety_margin_m = 0.0F;
+  snapshot.full_scale_violation_m = 1.0F;
+  snapshot.barrier_weight = 9.0F;
+  EXPECT_FLOAT_EQ(snapshot.referenceCost(), 9.0F);
+  snapshot.clearance_m[0] = 1.0F;   // circle just touching the line: no intrusion
+  snapshot.clearance_m[1] = 0.5F;   // half of the radius intruded
+  snapshot.clearance_m[2] = 0.0F;   // footprint center on the line
+  snapshot.clearance_m[3] = -3.0F;  // beyond: saturated
+  const auto message = makeCostmapGrid(snapshot, 0.0);
+  EXPECT_EQ(message.data[0], 0);
+  EXPECT_EQ(message.data[1], 50);
+  EXPECT_EQ(message.data[2], 100);
+  EXPECT_EQ(message.data[3], 100);
 }
 
 TEST(MppiCostmapGrid, DisabledBarrierProducesAFlatMap)
@@ -89,7 +109,7 @@ TEST(MppiCostmapGrid, DisabledBarrierProducesAFlatMap)
   auto snapshot = makeSnapshot();
   snapshot.barrier_weight = 0.0F;
   snapshot.clearance_m.assign(8U, -1.0F);
-  const auto message = makeObstacleCostmapGrid(snapshot, 0.0);
+  const auto message = makeCostmapGrid(snapshot, 0.0);
   for (const auto value : message.data) {
     EXPECT_EQ(value, 0);
   }

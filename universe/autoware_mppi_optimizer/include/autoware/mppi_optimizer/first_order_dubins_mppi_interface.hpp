@@ -443,13 +443,14 @@ struct FirstOrderDubinsMppiRolloutDiagnostics
 };
 
 /**
- * Obstacle distance field returned together with the rest of the optimization result.
+ * Distance field layer returned together with the rest of the optimization result: the obstacle
+ * field (one time slice), or the static road-border / drivable-area field.
  *
- * This is a copy of one time slice of the very texture the rollouts sample; no cost is
- * recomputed for it. The grid is axis-aligned in `frame_id` (it is centered on the reference
- * path, not on base_link), so `ego_*` is provided to locate base_link inside it. Cell (col, row)
- * has its center at (origin_x + (col + 0.5) * resolution_m, origin_y + (row + 0.5) *
- * resolution_m); storage is row-major (`row * width + col`), the nav_msgs/OccupancyGrid layout.
+ * This is a copy of the very texture the rollouts sample; no cost is recomputed for it. The grid is
+ * axis-aligned in `frame_id` (it is centered on the reference path, not on base_link), so `ego_*`
+ * is provided to locate base_link inside it. Cell (col, row) has its center at (origin_x + (col +
+ * 0.5) * resolution_m, origin_y + (row + 0.5) * resolution_m); storage is row-major (`row * width +
+ * col`), the nav_msgs/OccupancyGrid layout.
  *
  * The rollout obstacle barrier of an ego footprint circle centered on a cell is derived from
  * the stored clearance with `barrierCost()`.
@@ -478,7 +479,16 @@ struct FirstOrderDubinsMppiCostmapSnapshot
   /** obstacle_collision_margin + obstacle_safe_margin: distance at which the barrier starts. */
   float safety_margin_m{0.0F};
   float barrier_weight{0.0F};
-  /** Signed distance [m] from the cell center to the nearest obstacle box (<0 inside). */
+  /**
+   * Barrier intrusion [m] that maps to full heat. 0 means "use safety_margin_m" (obstacle
+   * layer: footprint circle touching the obstacle). Static layers set it to margin + circle
+   * radius because their margin can be zero.
+   */
+  float full_scale_violation_m{0.0F};
+  /**
+   * Distance [m] from the cell center to the nearest obstacle box (<0 inside), or to the nearest
+   * road-border / drivable-area segment (unsigned) for the static layers.
+   */
   std::vector<float> clearance_m;
 
   /** The rollout obstacle barrier cost for an ego footprint circle centered at `clearance`. */
@@ -492,7 +502,9 @@ struct FirstOrderDubinsMppiCostmapSnapshot
   /** Barrier cost at exact contact; use it to normalize `barrierCost()`. Zero if disabled. */
   [[nodiscard]] float referenceCost() const
   {
-    return barrier_weight * safety_margin_m * safety_margin_m;
+    const float full_scale =
+      full_scale_violation_m > 0.0F ? full_scale_violation_m : safety_margin_m;
+    return barrier_weight * full_scale * full_scale;
   }
 };
 
@@ -564,6 +576,9 @@ struct FirstOrderDubinsMppiDebug
     FirstOrderDubinsMppiMpcNominalSeedStatus::disabled};
   /** Obstacle distance slice; only filled when the costmap debug option is enabled. */
   FirstOrderDubinsMppiCostmapSnapshot obstacle_costmap;
+  /** Static map layers (same grid); only filled when enable_static_costmap_debug is set. */
+  FirstOrderDubinsMppiCostmapSnapshot road_border_costmap;
+  FirstOrderDubinsMppiCostmapSnapshot drivable_area_costmap;
 };
 
 struct FirstOrderDubinsMppiOptimizationResult

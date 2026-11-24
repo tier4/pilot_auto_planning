@@ -960,6 +960,8 @@ struct FirstOrderDubinsMppiInterface::Impl
   bool enable_rollout_visualization{false};
   /** Capture and replay a sampled rollout subset from every internal MPPI iteration. */
   bool enable_iteration_rollout_debug{false};
+  /** Copy the static road-border / drivable-area textures to the host and return them. */
+  bool static_costmap_enabled{false};
   /** Copy an obstacle texture slice to the host and return it with the result. */
   bool obstacle_costmap_enabled{false};
   int obstacle_costmap_time_step{0};
@@ -2421,15 +2423,15 @@ struct FirstOrderDubinsMppiInterface::Impl
       uploadBoundarySegments();
       cost.commitDataUpdate();
     }
-    cost.renderDistanceMapTextureDebug();
-    if (obstacle_costmap_enabled) {
+    if (obstacle_costmap_enabled || static_costmap_enabled) {
       // Queued on the rollout stream before computeControl(): the async copy of the texture slice
       // finishes under the synchronization computeControl() already does, so reading the result
       // later costs no extra stream sync.
       costmap_ego_x = ego.x;
       costmap_ego_y = ego.y;
       costmap_ego_yaw = ego.yaw;
-      cost.enqueueObstacleCostmap(obstacle_costmap_time_step);
+      if (obstacle_costmap_enabled) cost.enqueueObstacleCostmap(obstacle_costmap_time_step);
+      if (static_costmap_enabled) cost.enqueueStaticCostmaps();
     }
 
     controller->updateImportanceSampler(u_nom);
@@ -2816,7 +2818,7 @@ void FirstOrderDubinsMppiInterface::setRuntimeOptions(
     impl_->short_reference_steering_hold_active = false;
     setDebugTrajectoryLogging(
       options.enable_debug_trajectory_log, options.debug_trajectory_log_directory);
-    impl_->cost.setDistanceMapTextureDebugEnabled(options.enable_distance_map_texture_debug);
+    impl_->static_costmap_enabled = options.enable_static_costmap_debug;
     impl_->enable_iteration_rollout_debug = options.enable_iteration_rollout_debug;
     impl_->obstacle_costmap_enabled = options.enable_obstacle_costmap_debug;
     impl_->obstacle_costmap_time_step = std::max(0, options.obstacle_costmap_time_step);
@@ -3179,11 +3181,10 @@ try {
   applied_plant.steer_cmd_delay_buffer = impl_->steer_delay_buffer;
   applied_plant.applied_control = control;
 
-  if (impl_->obstacle_costmap_enabled) {
-    // The copy was queued before computeControl(), which has synchronized the stream since, so
+  if (impl_->obstacle_costmap_enabled || impl_->static_costmap_enabled) {
+    // The copies were queued before computeControl(), which has synchronized the stream since, so
     // this only hands over already-resident pinned memory.
-    auto & costmap = result.debug.obstacle_costmap;
-    if (impl_->cost.collectObstacleCostmap(costmap)) {
+    const auto place = [&](FirstOrderDubinsMppiCostmapSnapshot & costmap) {
       costmap.frame_id = odometry.header.frame_id;
       costmap.stamp = odometry.header.stamp;
       costmap.origin_x = impl_->frame.worldX(static_cast<float>(costmap.origin_x));
@@ -3191,8 +3192,22 @@ try {
       costmap.ego_x = impl_->costmap_ego_x;
       costmap.ego_y = impl_->costmap_ego_y;
       costmap.ego_yaw = impl_->costmap_ego_yaw;
-      // Texture slice k holds the post-step state at (k + 1) * dt, like the rollout costs.
-      costmap.time_offset_s = static_cast<float>(costmap.time_step_index + 1) * kDt;
+    };
+    if (impl_->obstacle_costmap_enabled) {
+      auto & costmap = result.debug.obstacle_costmap;
+      if (impl_->cost.collectObstacleCostmap(costmap)) {
+        place(costmap);
+        // Texture slice k holds the post-step state at (k + 1) * dt, like the rollout costs.
+        costmap.time_offset_s = static_cast<float>(costmap.time_step_index + 1) * kDt;
+      }
+    }
+    if (impl_->static_costmap_enabled) {
+      auto & road_border = result.debug.road_border_costmap;
+      auto & drivable_area = result.debug.drivable_area_costmap;
+      if (impl_->cost.collectStaticCostmaps(road_border, drivable_area)) {
+        place(road_border);
+        place(drivable_area);
+      }
     }
   }
 

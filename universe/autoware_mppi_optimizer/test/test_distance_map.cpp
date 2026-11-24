@@ -59,12 +59,6 @@ struct DistanceMapTextureTestAccess
   {
     return cost.texture_state_.nearest_segment_array_;
   }
-
-  template <class CostT>
-  static const DistanceMapTextureVisualizer * visualizer(const CostT & cost)
-  {
-    return cost.texture_state_.distance_map_visualizer_;
-  }
 };
 
 namespace
@@ -942,7 +936,9 @@ TEST_F(DistanceMapGpuTest, ObstacleCostmapIsTheTextureSliceTheRolloutsSample)
   ASSERT_TRUE(cost_->enqueueObstacleCostmap(0));
   autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot costmap;
   ASSERT_TRUE(cost_->collectObstacleCostmap(costmap));
-  EXPECT_FALSE(cost_->collectObstacleCostmap(costmap)) << "a result must be handed out once";
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot second_call;
+  EXPECT_FALSE(cost_->collectObstacleCostmap(second_call)) << "a result must be handed out once";
+  EXPECT_FALSE(second_call.valid);
 
   ASSERT_TRUE(costmap.valid);
   EXPECT_FALSE(costmap.empty);
@@ -1075,29 +1071,98 @@ TEST_F(DistanceMapGpuTest, ObstacleCostmapIsEmptyWithoutObstaclesAndNeverReadsSt
   }));
 }
 
-TEST_F(DistanceMapGpuTest, HeadlessVisualizerFailureLeavesNoLiveVisualizer)
+TEST_F(DistanceMapGpuTest, StaticCostmapsAreTheTextureTheRolloutsSample)
 {
-  if (std::getenv("DISPLAY") != nullptr || std::getenv("WAYLAND_DISPLAY") != nullptr) {
-    GTEST_SKIP() << "Headless fallback requires an environment without a display server";
+  using costmap_test::cellAt;
+  TestParams params = distanceOnlyParams();
+  params.ego_length = 4.0F;
+  params.ego_width = 2.0F;
+  params.road_border_collision_margin = 0.2F;
+  params.road_border_safe_margin = 0.8F;
+  params.road_border_barrier_weight = 3.0F;
+  params.drivable_area_safe_margin = 0.0F;
+  params.drivable_area_barrier_weight = 7.0F;
+  cost_->setParams(params);
+  cost_->setRoadBorderSegments({Segment{-30.0F, 4.0F, 30.0F, 4.0F}});
+  cost_->setDrivableAreaSegments({Segment{-30.0F, -6.0F, 30.0F, -6.0F}});
+
+  ASSERT_TRUE(cost_->enqueueStaticCostmaps());
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot road_border;
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot drivable_area;
+  ASSERT_TRUE(cost_->collectStaticCostmaps(road_border, drivable_area));
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot unused_road_border;
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot unused_drivable_area;
+  EXPECT_FALSE(cost_->collectStaticCostmaps(unused_road_border, unused_drivable_area))
+    << "a result must be handed out once";
+  EXPECT_FALSE(unused_road_border.valid);
+
+  ASSERT_TRUE(road_border.valid);
+  ASSERT_TRUE(drivable_area.valid);
+  EXPECT_FALSE(road_border.empty);
+  EXPECT_FALSE(drivable_area.empty);
+  ASSERT_GT(road_border.width, 0);
+  ASSERT_EQ(road_border.width, drivable_area.width);
+  ASSERT_EQ(road_border.height, drivable_area.height);
+  ASSERT_EQ(
+    road_border.clearance_m.size(),
+    static_cast<std::size_t>(road_border.width * road_border.height));
+  ASSERT_EQ(drivable_area.clearance_m.size(), road_border.clearance_m.size());
+
+  float circle_x[kEgoSpineCircleCount];
+  float circle_y[kEgoSpineCircleCount];
+  float circle_radius = 0.0F;
+  computeEgoSpineCircles(0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 1.0F, circle_x, circle_y, circle_radius);
+  const float road_margin = params.road_border_collision_margin + params.road_border_safe_margin;
+  EXPECT_NEAR(road_border.safety_margin_m, road_margin, 1.0E-6F);
+  EXPECT_NEAR(road_border.barrier_weight, params.road_border_barrier_weight, 1.0E-6F);
+  EXPECT_NEAR(road_border.footprint_circle_radius_m, circle_radius, 1.0E-6F);
+  EXPECT_NEAR(road_border.full_scale_violation_m, road_margin + circle_radius, 1.0E-6F);
+  EXPECT_NEAR(drivable_area.safety_margin_m, 0.0F, 1.0E-6F);
+  EXPECT_NEAR(drivable_area.full_scale_violation_m, circle_radius, 1.0E-6F);
+  // A zero margin must not produce a zero-scale (flat) drivable-area heat map.
+  EXPECT_GT(drivable_area.referenceCost(), 0.0F);
+
+  // Each channel is the distance to its own polyline, at the cell center. Both lines are
+  // horizontal, so a swapped channel or a transposed grid fails.
+  for (const auto & [x, y] :
+       {std::pair{0.0F, 0.0F}, std::pair{5.0F, 3.0F}, std::pair{-8.0F, -4.0F}}) {
+    const auto [index, center] = cellAt(road_border, x, y);
+    EXPECT_NEAR(road_border.clearance_m[index], std::abs(center.second - 4.0F), 0.2F)
+      << x << ", " << y;
+    EXPECT_NEAR(drivable_area.clearance_m[index], std::abs(center.second + 6.0F), 0.2F)
+      << x << ", " << y;
   }
-  EXPECT_NO_THROW(cost_->setDistanceMapTextureDebugEnabled(true));
-  EXPECT_EQ(DistanceMapTextureTestAccess::visualizer(*cost_), nullptr);
-  EXPECT_NO_THROW(cost_->renderDistanceMapTextureDebug());
+  // The derived barrier equals the rollout barrier for the same clearance.
+  const std::size_t beside = cellAt(road_border, 0.0F, 3.0F).first;
+  EXPECT_NEAR(
+    road_border.barrierCost(road_border.clearance_m[beside]),
+    computeSmoothBarrierCost(
+      road_border.clearance_m[beside] - circle_radius, road_margin,
+      params.road_border_barrier_weight),
+    1.0E-3F);
 }
 
-TEST_F(DistanceMapGpuTest, VisualizerCanBeEnabledRenderedAndDisabled)
+TEST_F(DistanceMapGpuTest, StaticCostmapsCopyOnlyWhenTheTextureWasRebuilt)
 {
-  if (std::getenv("DISPLAY") == nullptr && std::getenv("WAYLAND_DISPLAY") == nullptr) {
-    GTEST_SKIP() << "Visualizer toggle requires a display server";
-  }
-  cost_->setRoadBorderSegments({Segment{-5.0F, 3.0F, 5.0F, 3.0F}});
-  EXPECT_NO_THROW(cost_->setDistanceMapTextureDebugEnabled(true));
-  if (DistanceMapTextureTestAccess::visualizer(*cost_) == nullptr) {
-    GTEST_SKIP() << "CUDA/OpenGL interoperability is unavailable";
-  }
-  EXPECT_NO_THROW(cost_->renderDistanceMapTextureDebug());
-  EXPECT_NO_THROW(cost_->setDistanceMapTextureDebugEnabled(false));
-  EXPECT_EQ(DistanceMapTextureTestAccess::visualizer(*cost_), nullptr);
+  cost_->setRoadBorderSegments({Segment{-30.0F, 4.0F, 30.0F, 4.0F}});
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot road_border;
+  autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot drivable_area;
+
+  ASSERT_TRUE(cost_->enqueueStaticCostmaps());
+  ASSERT_TRUE(cost_->collectStaticCostmaps(road_border, drivable_area));
+  const std::uint64_t copies = cost_->staticCostmapCopyCount();
+  ASSERT_GE(copies, 1U);
+
+  // Same texture: the pinned copy is still exact, so nothing is copied again.
+  ASSERT_TRUE(cost_->enqueueStaticCostmaps());
+  ASSERT_TRUE(cost_->collectStaticCostmaps(road_border, drivable_area));
+  EXPECT_EQ(cost_->staticCostmapCopyCount(), copies);
+
+  // New geometry rebuilds the texture and must be copied again.
+  cost_->setRoadBorderSegments({Segment{-30.0F, 8.0F, 30.0F, 8.0F}});
+  ASSERT_TRUE(cost_->enqueueStaticCostmaps());
+  ASSERT_TRUE(cost_->collectStaticCostmaps(road_border, drivable_area));
+  EXPECT_EQ(cost_->staticCostmapCopyCount(), copies + 1U);
 }
 
 TEST(DistanceMapResourceTest, DestructorReleasesDistanceMapAllocations)

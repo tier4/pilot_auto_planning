@@ -37,8 +37,7 @@ void declare_first_order_dubins_mppi_runtime_options(
   node.declare_parameter(
     param_name(prefix, "debug_trajectory_log_directory"), defaults.debug_trajectory_log_directory);
   node.declare_parameter(
-    param_name(prefix, "enable_distance_map_texture_debug"),
-    defaults.enable_distance_map_texture_debug);
+    param_name(prefix, "enable_static_costmap_debug"), defaults.enable_static_costmap_debug);
   node.declare_parameter(
     param_name(prefix, "enable_obstacle_costmap_debug"), defaults.enable_obstacle_costmap_debug);
   node.declare_parameter(
@@ -109,8 +108,8 @@ FirstOrderDubinsMppiRuntimeOptions get_first_order_dubins_mppi_runtime_options(
     node.get_parameter(param_name(prefix, "enable_debug_trajectory_log")).as_bool();
   options.debug_trajectory_log_directory =
     node.get_parameter(param_name(prefix, "debug_trajectory_log_directory")).as_string();
-  options.enable_distance_map_texture_debug =
-    node.get_parameter(param_name(prefix, "enable_distance_map_texture_debug")).as_bool();
+  options.enable_static_costmap_debug =
+    node.get_parameter(param_name(prefix, "enable_static_costmap_debug")).as_bool();
   options.enable_obstacle_costmap_debug =
     node.get_parameter(param_name(prefix, "enable_obstacle_costmap_debug")).as_bool();
   options.obstacle_costmap_time_step =

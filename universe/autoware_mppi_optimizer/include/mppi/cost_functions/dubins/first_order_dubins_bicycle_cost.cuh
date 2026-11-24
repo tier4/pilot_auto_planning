@@ -200,7 +200,6 @@ public:
   /** Value-initialized CPU storage before GPU setup; copied into the device-side cost object. */
   RuntimeData runtime_data_device_{};
   DistanceMapTextureState texture_state_{};
-  bool distance_map_texture_debug_enabled_{false};
 
   __host__ __device__ __forceinline__ RuntimeData & runtimeData()
   {
@@ -337,12 +336,6 @@ public:
 
   void clearDrivableArea();
 
-  /** Enable or disable the CUDA-OpenGL distance-map debug window. */
-  __host__ void setDistanceMapTextureDebugEnabled(bool enable);
-
-  /** Refresh the debug window after all distance maps for the current control cycle are ready. */
-  __host__ void renderDistanceMapTextureDebug();
-
   /**
    * Queue an asynchronous copy of one obstacle texture slice into pinned host memory. The copy is
    * ordered on the rollout stream, so call it after commitDataUpdate() and before
@@ -358,6 +351,27 @@ public:
    */
   __host__ bool collectObstacleCostmap(
     autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot & out);
+
+  /**
+   * Queue an asynchronous copy of the static (road-border / drivable-area) distance texture into
+   * pinned host memory, with the same ordering and synchronization contract as
+   * enqueueObstacleCostmap(). The copy is skipped while the texture has not been rebuilt since
+   * the last copy.
+   * @return false when no static texture is available.
+   */
+  __host__ bool enqueueStaticCostmaps();
+
+  /**
+   * Hand out the layers queued by enqueueStaticCostmaps() (once). Coordinates are in the cost's
+   * local frame; frame_id, stamp and ego pose are left to the caller. A layer whose texture channel
+   * is not valid (or has no geometry) is returned `empty`.
+   */
+  __host__ bool collectStaticCostmaps(
+    autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot & road_border,
+    autoware::mppi_optimizer::FirstOrderDubinsMppiCostmapSnapshot & drivable_area);
+
+  /** Number of device-to-host static texture copies issued so far. */
+  [[nodiscard]] std::uint64_t staticCostmapCopyCount() const { return static_costmap_copy_count_; }
 
   /** Number of device-to-host slice copies issued so far. */
   [[nodiscard]] std::uint64_t obstacleCostmapCopyCount() const
@@ -523,6 +537,7 @@ private:
   __host__ void distanceMapStateToDevice();
   __host__ void releaseDistanceMapResources();
   __host__ void ensureObstacleCostmapResources();
+  __host__ void ensureStaticCostmapResources();
 
   bool preferred_lane_center_geometry_dirty_ = false;
   bool preferred_lane_center_texture_enabled_ = true;
@@ -546,6 +561,17 @@ private:
   std::uint64_t obstacle_costmap_cached_build_ = 0;
   int obstacle_costmap_cached_step_ = 0;
   std::uint64_t obstacle_costmap_copy_count_ = 0;
+  /** Interleaved (road border, drivable area) distances of the static texture build below. */
+  mppi::memory::PinnedHostBuffer<float> static_costmap_host_{};
+  cudaEvent_t static_costmap_done_ = nullptr;
+  bool static_costmap_pending_ = false;
+  DistanceMapTextureGrid static_costmap_grid_{};
+  bool static_costmap_road_border_valid_ = false;
+  bool static_costmap_drivable_area_valid_ = false;
+  bool static_costmap_cached_ = false;
+  std::uint64_t static_costmap_cached_build_ = 0;
+  std::uint64_t static_costmap_copy_count_ = 0;
+  std::uint64_t static_texture_build_count_ = 0;
   std::uint64_t obstacle_texture_build_count_ = 0;
 };
 

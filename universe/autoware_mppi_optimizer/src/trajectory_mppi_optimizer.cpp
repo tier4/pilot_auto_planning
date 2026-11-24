@@ -138,7 +138,7 @@ FirstOrderDubinsMppiRuntimeOptions make_runtime_options(
   FirstOrderDubinsMppiRuntimeOptions output;
   output.enable_debug_trajectory_log = params.enable_debug_trajectory_log;
   output.debug_trajectory_log_directory = params.debug_trajectory_log_directory;
-  output.enable_distance_map_texture_debug = params.enable_distance_map_texture_debug;
+  output.enable_static_costmap_debug = params.enable_static_costmap_debug;
   output.enable_iteration_rollout_debug = params.enable_iteration_rollout_debug;
   output.enable_obstacle_costmap_debug = params.enable_obstacle_costmap_debug;
   output.obstacle_costmap_time_step = static_cast<int>(params.obstacle_costmap_time_step);
@@ -411,6 +411,10 @@ void TrajectoryMppiOptimizer::on_initialize(
   rollouts_pub_ = make_publisher<MarkerArray>("~/debug/mppi/rollouts", 1);
   obstacle_costmap_pub_ =
     make_publisher<nav_msgs::msg::OccupancyGrid>("~/debug/mppi/obstacle_costmap", 1);
+  road_border_costmap_pub_ =
+    make_publisher<nav_msgs::msg::OccupancyGrid>("~/debug/mppi/road_border_costmap", 1);
+  drivable_area_costmap_pub_ =
+    make_publisher<nav_msgs::msg::OccupancyGrid>("~/debug/mppi/drivable_area_costmap", 1);
   enabled_pub_ = make_publisher<std_msgs::msg::Bool>(
     "~/debug/mppi/enabled", rclcpp::QoS{1}.transient_local());
   publish_enabled(false);
@@ -451,6 +455,8 @@ ProcessingResult TrajectoryMppiOptimizer::process(
 
   pending_debug_.reset();
   pending_costmap_ = {};
+  pending_road_border_costmap_ = {};
+  pending_drivable_area_costmap_ = {};
   pending_markers_.markers.clear();
   debug_pending_ = false;
   input_collision_activation_source_ = InputCollisionActivationSource::none;
@@ -731,6 +737,8 @@ ProcessingResult TrajectoryMppiOptimizer::process(
     }
 
     pending_costmap_ = std::move(result.debug.obstacle_costmap);
+    pending_road_border_costmap_ = std::move(result.debug.road_border_costmap);
+    pending_drivable_area_costmap_ = std::move(result.debug.drivable_area_costmap);
     pending_costmap_z_ = data.current_odometry->pose.pose.position.z;
     pending_debug_ = result.debug;
     pending_debug_header_ = input.header;
@@ -992,13 +1000,25 @@ void TrajectoryMppiOptimizer::publish_debug_data(const std::string &) const
   velocity_limit_trajectory_pub_(velocity_limits);
   markers_pub_(pending_markers_);
   rollouts_pub_(pending_rollouts_);
-  if (
-    pending_costmap_.valid && obstacle_costmap_pub_ &&
-    (obstacle_costmap_pub_.get_subscription_count() > 0U ||
-     obstacle_costmap_pub_.get_intra_process_subscription_count() > 0U)) {
-    obstacle_costmap_pub_(makeObstacleCostmapGrid(pending_costmap_, pending_costmap_z_));
-  }
+  // Layers are stacked a few centimeters apart so overlapping grids never z-fight.
+  const auto publish_layer = [this](
+                               const FirstOrderDubinsMppiCostmapSnapshot & layer,
+                               const PublisherHandle<nav_msgs::msg::OccupancyGrid> & publisher,
+                               const double height_offset) {
+    // Converting a layer to a heatmap is O(cells); skip it when nobody is looking.
+    if (
+      layer.valid && publisher &&
+      (publisher.get_subscription_count() > 0U ||
+       publisher.get_intra_process_subscription_count() > 0U)) {
+      publisher(makeCostmapGrid(layer, pending_costmap_z_ + height_offset));
+    }
+  };
+  publish_layer(pending_costmap_, obstacle_costmap_pub_, 0.06);
+  publish_layer(pending_road_border_costmap_, road_border_costmap_pub_, 0.04);
+  publish_layer(pending_drivable_area_costmap_, drivable_area_costmap_pub_, 0.02);
   pending_costmap_ = {};
+  pending_road_border_costmap_ = {};
+  pending_drivable_area_costmap_ = {};
   debug_pending_ = false;
 }
 
@@ -1283,16 +1303,20 @@ void TrajectoryMppiOptimizer::clear_markers(const std_msgs::msg::Header & header
   markers.markers.push_back(marker);
   markers_pub_(markers);
   rollouts_pub_(markers);
+  // A single transparent cell replaces the last heatmap while MPPI is not running.
+  nav_msgs::msg::OccupancyGrid grid;
+  grid.header = header;
+  grid.info.resolution = 1.0F;
+  grid.info.width = 1U;
+  grid.info.height = 1U;
+  grid.info.origin.orientation.w = 1.0;
+  grid.data.assign(1U, static_cast<std::int8_t>(0));
   if (params_.enable_obstacle_costmap_debug && obstacle_costmap_pub_) {
-    // A single unknown cell replaces the last heatmap while MPPI is not running.
-    nav_msgs::msg::OccupancyGrid grid;
-    grid.header = header;
-    grid.info.resolution = 1.0F;
-    grid.info.width = 1U;
-    grid.info.height = 1U;
-    grid.info.origin.orientation.w = 1.0;
-    grid.data.assign(1U, static_cast<std::int8_t>(-1));
     obstacle_costmap_pub_(grid);
+  }
+  if (params_.enable_static_costmap_debug) {
+    if (road_border_costmap_pub_) road_border_costmap_pub_(grid);
+    if (drivable_area_costmap_pub_) drivable_area_costmap_pub_(grid);
   }
 }
 

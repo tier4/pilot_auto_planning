@@ -287,7 +287,6 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
   // Managed copies the embedded device snapshot, including values set before GPU setup.
   runtime_data_device_ = runtime_data_.data()[0];
   PARENT_CLASS::GPUSetup();
-  setDistanceMapTextureDebugEnabled(distance_map_texture_debug_enabled_);
   if (!data_update_active_) refreshPreferredLaneCenterTexture();
 }
 
@@ -297,9 +296,6 @@ __host__ void FirstOrderDubinsBicycleCostImpl<
 {
   if (this->GPUMemStatus_)
     gpuAssert(cudaStreamSynchronize(this->stream_), __FILE__, __LINE__, false);
-  const bool debug_enabled = distance_map_texture_debug_enabled_;
-  cleanupNoThrow([&] { setDistanceMapTextureDebugEnabled(false); });
-  distance_map_texture_debug_enabled_ = debug_enabled;
   releaseDistanceMapResources();
   PARENT_CLASS::freeCudaMem();
   if (runtime_data_.size() != 0) runtime_data_device_ = runtime_data_.data()[0];
