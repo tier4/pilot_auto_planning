@@ -16,6 +16,8 @@
 
 #include "autoware/diffusion_planner/dimensions.hpp"
 
+#include <autoware/tensorrt_common/tensorrt_common.hpp>
+
 #include <onnxruntime_c_api.h>
 
 #include <chrono>
@@ -70,20 +72,14 @@ void append_cuda_provider(Ort::SessionOptions & session_options)
 void append_tensorrt_provider(
   Ort::SessionOptions & session_options, const std::string & plugins_path)
 {
+  // ONNX Runtime offers the plugins it finds in TensorRT's registry as custom operators. Its
+  // own trt_extra_plugin_lib_paths option only opens the library, which registers nothing.
+  if (!plugins_path.empty() && !autoware::tensorrt_common::loadPluginLibrary(plugins_path)) {
+    throw std::runtime_error("Could not load the TensorRT plugin library " + plugins_path);
+  }
+
   OrtTensorRTProviderOptionsV2 * trt_options = nullptr;
   Ort::ThrowOnError(Ort::GetApi().CreateTensorRTProviderOptions(&trt_options));
-
-  std::vector<const char *> keys;
-  std::vector<const char *> values;
-  if (!plugins_path.empty()) {
-    keys.push_back("trt_extra_plugin_lib_paths");
-    values.push_back(plugins_path.c_str());
-  }
-  if (!keys.empty()) {
-    Ort::ThrowOnError(
-      Ort::GetApi().UpdateTensorRTProviderOptions(
-        trt_options, keys.data(), values.data(), keys.size()));
-  }
   Ort::ThrowOnError(
     Ort::GetApi().SessionOptionsAppendExecutionProvider_TensorRT_V2(session_options, trt_options));
   Ort::GetApi().ReleaseTensorRTProviderOptions(trt_options);
