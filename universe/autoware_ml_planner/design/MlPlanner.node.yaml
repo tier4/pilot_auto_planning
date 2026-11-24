@@ -18,6 +18,8 @@ subscribers:
     message_type: nav_msgs/msg/Odometry
   - name: steering_status
     message_type: autoware_vehicle_msgs/msg/SteeringReport
+  - name: acceleration
+    message_type: geometry_msgs/msg/AccelWithCovarianceStamped
   - name: route
     message_type: autoware_planning_msgs/msg/LaneletRoute
     qos:

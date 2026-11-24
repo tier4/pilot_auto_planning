@@ -10,7 +10,7 @@ package:
 launch:
   plugin: autoware::trajectory_modifier::TrajectoryModifier
   executable: autoware_trajectory_modifier_node
-  node_output: screen
+  node_output: both
 
 # interfaces
 subscribers:
@@ -52,6 +52,8 @@ subscribers:
     qos:
       reliability: reliable
       durability: transient_local
+  - name: scenario_max_velocity_mps
+    message_type: autoware_internal_planning_msgs/msg/VelocityLimit
 
 publishers:
   - name: trajectory

@@ -10,7 +10,7 @@ package:
 launch:
   plugin: autoware::trajectory_selector::TrajectorySelectorNode
   executable: autoware_trajectory_selector_node
-  node_output: screen
+  node_output: both
 
 # interfaces
 subscribers:

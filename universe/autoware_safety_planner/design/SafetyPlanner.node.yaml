@@ -58,6 +58,8 @@ param_files:
     default: $(find-pkg-share autoware_safety_planner)/config/constraint_generator/lane_following_drivable_area.param.yaml
   - name: obstacle_stop_param
     default: $(find-pkg-share autoware_safety_planner)/config/constraint_generator/obstacle_stop.param.yaml
+  - name: obstacle_slow_down_param
+    default: $(find-pkg-share autoware_safety_planner)/config/constraint_generator/obstacle_slow_down.param.yaml
   - name: frenet_sampling_based_planner_param
     default: $(find-pkg-share autoware_safety_planner)/config/trajectory_planner/frenet_sampling_based_planner.param.yaml
   - name: reference_path_following_planner_param
