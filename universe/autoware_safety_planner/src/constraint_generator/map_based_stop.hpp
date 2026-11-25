@@ -120,6 +120,7 @@ public:
     IntersectionDebugLanelets & debug_lanelets) const;
 
   //! Keep only the stop lines that intersect the trajectory (in 2D).
+  // cppcheck-suppress functionStatic
   std::vector<StopLine> filter_stop_lines_on_trajectory(
     const std::vector<StopLine> & stop_lines, const TrajectoryPoints & traj_points) const;
 
