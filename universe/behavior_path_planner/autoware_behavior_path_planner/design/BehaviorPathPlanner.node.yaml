@@ -34,8 +34,10 @@ subscribers:
     message_type: autoware_internal_planning_msgs/msg/Scenario
   - name: external_velocity_limit_mps
     message_type: autoware_internal_planning_msgs/msg/VelocityLimit
+    remap_target: /planning/scenario_planning/max_velocity
   - name: operation_mode_state
     message_type: autoware_adapi_v1_msgs/msg/OperationModeState
+    remap_target: /system/operation_mode/state
 
 publishers:
   - name: path_with_lane_id

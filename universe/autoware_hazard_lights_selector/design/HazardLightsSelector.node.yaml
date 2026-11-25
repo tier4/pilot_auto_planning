@@ -24,6 +24,7 @@ subscribers:
 publishers:
   - name: hazard_lights_cmd
     message_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+    remap_target: output/hazard_lights_command
 
 # parameters
 param_values: []
