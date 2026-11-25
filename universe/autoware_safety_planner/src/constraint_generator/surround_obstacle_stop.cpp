@@ -64,10 +64,10 @@ Parameters to_proximity_checker_parameters(const SurroundObstacleStopParams & p)
   const std::unordered_set<std::string> polygon_enabled_object_types(
     p.target_objects.polygon.begin(), p.target_objects.polygon.end());
 
-  const auto & front = p.front_distance_th;
-  const auto & side = p.side_distance_th;
-  const auto & back = p.back_distance_th;
   const auto get_object_distance_thresholds = [&](const std::string & label) {
+    const auto & front = p.front_distance_th;
+    const auto & side = p.side_distance_th;
+    const auto & back = p.back_distance_th;
     if (label == "car") return std::make_tuple(front.car, side.car, back.car);
     if (label == "truck") return std::make_tuple(front.truck, side.truck, back.truck);
     if (label == "bus") return std::make_tuple(front.bus, side.bus, back.bus);
@@ -93,8 +93,8 @@ Parameters to_proximity_checker_parameters(const SurroundObstacleStopParams & p)
       to_obstacle_type_parameters(front, side, back, bbox_enabled, polygon_enabled);
   }
 
-  parameters.obstacle_types_map["pointcloud"] =
-    to_obstacle_type_parameters(front.pointcloud, side.pointcloud, back.pointcloud);
+  parameters.obstacle_types_map["pointcloud"] = to_obstacle_type_parameters(
+    p.front_distance_th.pointcloud, p.side_distance_th.pointcloud, p.back_distance_th.pointcloud);
 
   return parameters;
 }
