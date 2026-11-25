@@ -188,6 +188,9 @@ void SafetyPlannerNode::on_timer()
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 5000,
       "Failed to update input. Skipping planning cycle.");
+    publish_trajectories(SafetyPlannerResult{});
+    normal_planning_factor_interface_->publish();
+    cautious_planning_factor_interface_->publish();
     return;
   }
 
@@ -284,13 +287,6 @@ bool SafetyPlannerNode::update_input(const InputData & input_data)
   autoware_utils_debug::ScopedTimeTrack st(__func__, *time_keeper_);
 
   input_.vehicle_info = vehicle_info_;
-
-  if (!update_route_manager(input_data)) {
-    RCLCPP_WARN_THROTTLE(
-      this->get_logger(), *this->get_clock(), 5000, "Failed to update RouteManager.");
-    return false;
-  }
-
   input_.odometry = *input_data.odometry_ptr;
   input_.acceleration = *input_data.acceleration_ptr;
   input_.steering = *input_data.steering_ptr;
@@ -303,6 +299,12 @@ bool SafetyPlannerNode::update_input(const InputData & input_data)
     input_data.external_velocity_limit_ptr
       ? std::make_optional<double>(input_data.external_velocity_limit_ptr->max_velocity)
       : std::nullopt;
+
+  if (!update_route_manager(input_data)) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000, "Failed to update RouteManager.");
+    return false;
+  }
 
   return true;
 }

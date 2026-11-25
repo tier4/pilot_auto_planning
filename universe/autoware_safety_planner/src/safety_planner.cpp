@@ -27,6 +27,9 @@
 #include <autoware_utils_geometry/geometry.hpp>
 #include <autoware_utils_math/normalization.hpp>
 
+#include <boost/geometry/algorithms/intersects.hpp>
+
+#include <lanelet2_core/LaneletMap.h>
 #include <lanelet2_core/geometry/Lanelet.h>
 
 #include <algorithm>
@@ -256,6 +259,49 @@ std::optional<PathPointTrajectory> blend_reference_path_to_ego(
 
   return experimental::trajectory::pretty_build(blended);
 }
+
+bool is_separated_by_road_border(
+  const lanelet::LaneletMapConstPtr & lanelet_map, const Point2d & ego, const Point2d & ref)
+{
+  constexpr double SEARCH_MARGIN_M = 0.1;
+  const lanelet::BoundingBox2d search_box{
+    lanelet::BasicPoint2d{
+      std::min(ego.x(), ref.x()) - SEARCH_MARGIN_M, std::min(ego.y(), ref.y()) - SEARCH_MARGIN_M},
+    lanelet::BasicPoint2d{
+      std::max(ego.x(), ref.x()) + SEARCH_MARGIN_M, std::max(ego.y(), ref.y()) + SEARCH_MARGIN_M}};
+  const Segment2d ego_to_ref{ego, ref};
+  for (const auto & linestring : lanelet_map->lineStringLayer.search(search_box)) {
+    if (
+      linestring.attributeOr(lanelet::AttributeName::Type, "") != std::string("road_border") ||
+      linestring.size() < 2) {
+      continue;
+    }
+    for (std::size_t i = 0; i + 1 < linestring.size(); ++i) {
+      const Segment2d border_segment{
+        Point2d{linestring[i].x(), linestring[i].y()},
+        Point2d{linestring[i + 1].x(), linestring[i + 1].y()}};
+      if (boost::geometry::intersects(ego_to_ref, border_segment)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+//! Arc length of ego on path, extrapolated along the end tangent when ego projects onto the end
+double effective_ego_arc_length(
+  const PathPointTrajectory & path, const geometry_msgs::msg::Point & ego)
+{
+  const double s_ego = experimental::trajectory::closest(path, ego);
+  if (s_ego < path.length() - 1e-3) {
+    return s_ego;
+  }
+  const auto end_pos = path.compute(path.length()).point.pose.position;
+  const double end_yaw = path.azimuth(path.length());
+  const double ds_beyond =
+    std::cos(end_yaw) * (ego.x - end_pos.x) + std::sin(end_yaw) * (ego.y - end_pos.y);
+  return s_ego + std::max(0.0, ds_beyond);
+}
 }  // namespace
 
 SafetyPlanner::SafetyPlanner(const Params & params, std::shared_ptr<TimeKeeper> time_keeper)
@@ -332,22 +378,31 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
 
   const auto lane_sequence =
     route_manager.get_lanelet_sequence_on_route(forward_length, backward_length);
+  const auto & window_lanelets = lane_sequence.as_lanelets();
+  const auto & ego_pose = input.odometry.pose.pose;
+
+  // Reject an ego pose that has moved off the route or faces away from it: RouteManager falls back
+  // to the nearest lanelet without distance/yaw limits, so tracking alone does not catch this.
+  if (!experimental::lanelet2_utils::get_closest_lanelet_within_constraint(
+        window_lanelets, ego_pose, params_.ego_nearest_lanelet.dist_threshold_m,
+        params_.ego_nearest_lanelet.yaw_threshold_rad)) {
+    return tl::unexpected("ego_pose is outside route lanelets or exceeds distance/yaw threshold");
+  }
 
   auto reference_path = experimental::trajectory::build_reference_path(
-    lane_sequence.as_lanelets(), route_manager.current_lanelet(), input.odometry.pose.pose,
-    route_manager.lanelet_map_ptr(), route_manager.routing_graph_ptr(),
-    route_manager.traffic_rules_ptr(), forward_length, backward_length);
+    window_lanelets, route_manager.current_lanelet(), ego_pose, route_manager.lanelet_map_ptr(),
+    route_manager.routing_graph_ptr(), route_manager.traffic_rules_ptr(), forward_length,
+    backward_length);
 
   if (!reference_path) {
     return tl::unexpected("Failed to build reference path: " + reference_path.error());
   }
 
-  const auto & window_lanelets = lane_sequence.as_lanelets();
-
   // build_reference_path() extends the path beyond lane_sequence with the whole routing graph, so
   // when ego's lane leaves the route before a lane change the tail is off-route. It is cut by the
   // lane_ids rather than by projecting the route end onto the path: a point outside the window
   // projects onto whichever end is geometrically closer, which may be the start behind ego.
+  double last_on_route_s = reference_path->length();
   {
     const auto points = reference_path->restore();
     const auto bases = reference_path->get_underlying_bases();
@@ -365,9 +420,35 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
         last_on_route = i;
       }
     }
-    const double s_ego =
-      experimental::trajectory::closest(*reference_path, input.odometry.pose.pose.position);
-    reference_path->crop(0.0, std::max(bases[last_on_route], s_ego));
+    last_on_route_s = bases[last_on_route];
+    const double s_ego = experimental::trajectory::closest(*reference_path, ego_pose.position);
+    reference_path->crop(0.0, std::max(last_on_route_s, s_ego));
+  }
+
+  // Reject an ego pose separated from the route by a road_border, or past the route/goal before
+  // ego_blend can pull the reference path back through it.
+  constexpr double GOAL_OVERRUN_TOLERANCE_M = 1.0;
+  const double s_ego_raw = experimental::trajectory::closest(*reference_path, ego_pose.position);
+  const auto ref_at_ego = reference_path->compute(s_ego_raw).point.pose.position;
+  const lanelet::BasicPoint2d ego_2d{ego_pose.position.x, ego_pose.position.y};
+  const bool inside_window_or_shoulder =
+    std::any_of(
+      window_lanelets.begin(), window_lanelets.end(),
+      [&](const auto & lanelet) { return lanelet::geometry::inside(lanelet, ego_2d); }) ||
+    !experimental::lanelet2_utils::get_shoulder_lanelets_at(
+       route_manager.lanelet_map_ptr(), ego_2d.x(), ego_2d.y())
+       .empty();
+  if (
+    !inside_window_or_shoulder &&
+    is_separated_by_road_border(
+      route_manager.lanelet_map_ptr(), Point2d{ego_2d.x(), ego_2d.y()},
+      Point2d{ref_at_ego.x, ref_at_ego.y})) {
+    return tl::unexpected("ego_pose is separated from route by road_border");
+  }
+
+  const double s_ego_effective = effective_ego_arc_length(*reference_path, ego_pose.position);
+  if (s_ego_effective - last_on_route_s > GOAL_OVERRUN_TOLERANCE_M) {
+    return tl::unexpected("ego_pose is beyond the end of the route");
   }
 
   // The goal is handled only once its lanelet is inside the window (or beside it, for a goal that
@@ -383,6 +464,20 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
              lanelet.leftBound().id() == goal_lanelet->rightBound().id() ||
              lanelet.rightBound().id() == goal_lanelet->leftBound().id();
     });
+
+  if (goal_in_window) {
+    const double s_goal_raw =
+      experimental::trajectory::closest(*reference_path, input.goal_pose.position);
+    if (
+      autoware_utils_geometry::calc_distance2d(
+        reference_path->compute(s_goal_raw).point.pose, input.goal_pose) <=
+        params_.reference_path.goal_connection.search_radius_m &&
+      s_goal_raw - s_ego_effective < -GOAL_OVERRUN_TOLERANCE_M) {
+      return tl::unexpected(
+        "goal_pose is behind ego on the reference path (length = " +
+        std::to_string(s_goal_raw - s_ego_effective) + ")");
+    }
+  }
 
   const auto & policy = params_.reference_path.policy;
   if (goal_in_window && (policy == "goal_connection" || policy == "goal_connection_and_smooth")) {
@@ -410,8 +505,8 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
   if (ego_blend.enable) {
     if (
       auto blended = blend_reference_path_to_ego(
-        *reference_path, input.odometry.pose.pose, ego_blend.lateral_threshold_m,
-        ego_blend.forward_length_m, ego_blend.backward_length_m)) {
+        *reference_path, ego_pose, ego_blend.lateral_threshold_m, ego_blend.forward_length_m,
+        ego_blend.backward_length_m)) {
       reference_path = std::move(*blended);
     }
   }
@@ -421,8 +516,7 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
     return std::move(reference_path.value());
   }
 
-  const double s_ego =
-    experimental::trajectory::closest(*reference_path, input.odometry.pose.pose.position);
+  const double s_ego = experimental::trajectory::closest(*reference_path, ego_pose.position);
   const double s_goal =
     experimental::trajectory::closest(*reference_path, input.goal_pose.position);
   if (
@@ -433,7 +527,6 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
     return std::move(reference_path.value());
   }
 
-  constexpr double GOAL_OVERRUN_TOLERANCE_M = 1.0;
   if (s_goal - s_ego < -GOAL_OVERRUN_TOLERANCE_M) {
     return tl::unexpected(
       "goal_pose is behind ego on the reference path (length = " + std::to_string(s_goal - s_ego) +
