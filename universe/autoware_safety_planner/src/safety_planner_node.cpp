@@ -311,16 +311,18 @@ bool SafetyPlannerNode::update_input(const InputData & input_data)
 
 void SafetyPlannerNode::publish_trajectories(const SafetyPlannerResult & result) const
 {
-  Trajectory ego_only;
-  ego_only.header.frame_id = "map";
-  ego_only.header.stamp = input_.odometry.header.stamp;
-  ego_only.points.emplace_back().pose = input_.odometry.pose.pose;
+  Trajectory ego_stopped;
+  ego_stopped.header.frame_id = "map";
+  ego_stopped.header.stamp = input_.odometry.header.stamp;
+  TrajectoryPoint ego_point;
+  ego_point.pose = input_.odometry.pose.pose;
+  ego_stopped.points = {ego_point, ego_point};
 
   CandidateTrajectories candidate_trajectories;
   const auto add = [&](
                      const std::optional<PlannedTrajectory> & planned, const UUID & generator_id,
                      const std::string & generator_name, const auto & debug_pub) {
-    const auto & trajectory = planned ? planned->trajectory : ego_only;
+    const auto & trajectory = planned ? planned->trajectory : ego_stopped;
     auto & candidate = candidate_trajectories.candidate_trajectories.emplace_back();
     candidate.header = trajectory.header;
     candidate.generator_id = generator_id;

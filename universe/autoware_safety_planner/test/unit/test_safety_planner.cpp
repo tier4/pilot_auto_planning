@@ -436,47 +436,38 @@ TEST_F(SafetyPlannerNodeOutputTest, PublishesEgoOnlyTrajectoryWhenEgoMovesOutsid
            msg.candidate_trajectories[1].points.size() > 1;
   }));
 
-  // 2. Move ego off route: planner outputs ego-only trajectories at the moved pose
+  const auto is_stopped_at = [](const CandidateTrajectories & msg, const Pose & pose) {
+    if (msg.candidate_trajectories.size() != 2) {
+      return false;
+    }
+    for (const auto & traj : msg.candidate_trajectories) {
+      if (traj.points.size() != 2) {
+        return false;
+      }
+      for (const auto & point : traj.points) {
+        if (
+          std::abs(point.pose.position.x - pose.position.x) > 1e-6 ||
+          std::abs(point.pose.position.y - pose.position.y) > 1e-6) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  // 2. Move ego off route: both candidates are the ego pose twice, so the length is zero
   const auto off_route_pose = make_pose(30.0, 20.0);
   latest_output.reset();
   publish_ego_state(off_route_pose);
-  ASSERT_TRUE(wait_for_output([&](const CandidateTrajectories & msg) {
-    if (msg.candidate_trajectories.size() != 2) {
-      return false;
-    }
-    for (const auto & traj : msg.candidate_trajectories) {
-      if (traj.points.size() != 1) {
-        return false;
-      }
-      if (
-        std::abs(traj.points[0].pose.position.x - off_route_pose.position.x) > 1e-6 ||
-        std::abs(traj.points[0].pose.position.y - off_route_pose.position.y) > 1e-6) {
-        return false;
-      }
-    }
-    return true;
-  }));
+  ASSERT_TRUE(wait_for_output(
+    [&](const CandidateTrajectories & msg) { return is_stopped_at(msg, off_route_pose); }));
 
-  // 3. Move ego past the goal (with lateral offset that would trigger ego_blend): still ego-only
+  // 3. Move ego past the goal (with lateral offset that would trigger ego_blend)
   const auto past_goal_pose = make_pose(85.0, 1.5);
   latest_output.reset();
   publish_ego_state(past_goal_pose);
-  ASSERT_TRUE(wait_for_output([&](const CandidateTrajectories & msg) {
-    if (msg.candidate_trajectories.size() != 2) {
-      return false;
-    }
-    for (const auto & traj : msg.candidate_trajectories) {
-      if (traj.points.size() != 1) {
-        return false;
-      }
-      if (
-        std::abs(traj.points[0].pose.position.x - past_goal_pose.position.x) > 1e-6 ||
-        std::abs(traj.points[0].pose.position.y - past_goal_pose.position.y) > 1e-6) {
-        return false;
-      }
-    }
-    return true;
-  }));
+  ASSERT_TRUE(wait_for_output(
+    [&](const CandidateTrajectories & msg) { return is_stopped_at(msg, past_goal_pose); }));
 }
 
 }  // namespace autoware::safety_planner
