@@ -402,7 +402,7 @@ tl::expected<PathPointTrajectory, std::string> SafetyPlanner::build_reference_pa
   // when ego's lane leaves the route before a lane change the tail is off-route. It is cut by the
   // lane_ids rather than by projecting the route end onto the path: a point outside the window
   // projects onto whichever end is geometrically closer, which may be the start behind ego.
-  double last_on_route_s = reference_path->length();
+  double last_on_route_s;
   {
     const auto points = reference_path->restore();
     const auto bases = reference_path->get_underlying_bases();
