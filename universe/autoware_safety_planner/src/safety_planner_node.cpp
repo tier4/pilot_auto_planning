@@ -188,6 +188,9 @@ void SafetyPlannerNode::on_timer()
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 5000,
       "Failed to update input. Skipping planning cycle.");
+    publish_trajectories(SafetyPlannerResult{});
+    normal_planning_factor_interface_->publish();
+    cautious_planning_factor_interface_->publish();
     return;
   }
 
@@ -284,13 +287,6 @@ bool SafetyPlannerNode::update_input(const InputData & input_data)
   autoware_utils_debug::ScopedTimeTrack st(__func__, *time_keeper_);
 
   input_.vehicle_info = vehicle_info_;
-
-  if (!update_route_manager(input_data)) {
-    RCLCPP_WARN_THROTTLE(
-      this->get_logger(), *this->get_clock(), 5000, "Failed to update RouteManager.");
-    return false;
-  }
-
   input_.odometry = *input_data.odometry_ptr;
   input_.acceleration = *input_data.acceleration_ptr;
   input_.steering = *input_data.steering_ptr;
@@ -304,21 +300,29 @@ bool SafetyPlannerNode::update_input(const InputData & input_data)
       ? std::make_optional<double>(input_data.external_velocity_limit_ptr->max_velocity)
       : std::nullopt;
 
+  if (!update_route_manager(input_data)) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000, "Failed to update RouteManager.");
+    return false;
+  }
+
   return true;
 }
 
 void SafetyPlannerNode::publish_trajectories(const SafetyPlannerResult & result) const
 {
-  Trajectory ego_only;
-  ego_only.header.frame_id = "map";
-  ego_only.header.stamp = input_.odometry.header.stamp;
-  ego_only.points.emplace_back().pose = input_.odometry.pose.pose;
+  Trajectory ego_stopped;
+  ego_stopped.header.frame_id = "map";
+  ego_stopped.header.stamp = input_.odometry.header.stamp;
+  TrajectoryPoint ego_point;
+  ego_point.pose = input_.odometry.pose.pose;
+  ego_stopped.points = {ego_point, ego_point};
 
   CandidateTrajectories candidate_trajectories;
   const auto add = [&](
                      const std::optional<PlannedTrajectory> & planned, const UUID & generator_id,
                      const std::string & generator_name, const auto & debug_pub) {
-    const auto & trajectory = planned ? planned->trajectory : ego_only;
+    const auto & trajectory = planned ? planned->trajectory : ego_stopped;
     auto & candidate = candidate_trajectories.candidate_trajectories.emplace_back();
     candidate.header = trajectory.header;
     candidate.generator_id = generator_id;
