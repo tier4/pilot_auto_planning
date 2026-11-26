@@ -1,0 +1,61 @@
+autoware_system_design_format: 0.3.0
+
+# node information
+name: MinimumRuleBasedPlanner.node
+
+package:
+  name: autoware_minimum_rule_based_planner
+  provider: autoware
+
+launch:
+  plugin: autoware::minimum_rule_based_planner::MinimumRuleBasedPlannerNode
+  executable: autoware_minimum_rule_based_planner_node
+  node_output: both
+
+# interfaces
+subscribers:
+  - name: route
+    message_type: autoware_planning_msgs/msg/LaneletRoute
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: vector_map
+    message_type: autoware_map_msgs/msg/LaneletMapBin
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: odometry
+    message_type: nav_msgs/msg/Odometry
+  - name: acceleration
+    message_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: objects
+    message_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: pointcloud
+    message_type: sensor_msgs/msg/PointCloud2
+    qos:
+      reliability: best_effort
+
+publishers:
+  - name: candidate_trajectories
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+
+# parameters
+param_files:
+  - name: common_param
+    default: $(find-pkg-share autoware_core_planning)/config/common.param.yaml
+  - name: minimum_rule_based_planner_param
+    default: $(find-pkg-share autoware_minimum_rule_based_planner)/config/minimum_rule_based_planner.param.yaml
+  - name: elastic_band_smoother_param
+    default: $(find-pkg-share autoware_minimum_rule_based_planner)/config/trajectory_optimizer_plugins/elastic_band_smoother.param.yaml
+  - name: jerk_filtered_smoother_param
+    default: $(find-pkg-share autoware_minimum_rule_based_planner)/config/velocity_smoother/jerk_filtered_smoother.param.yaml
+
+param_values: []
+
+# processes
+processes:
+  - name: plan_trajectory
+    trigger_conditions:
+      - periodic: 10.0
+    outcomes:
+      - to_output: candidate_trajectories

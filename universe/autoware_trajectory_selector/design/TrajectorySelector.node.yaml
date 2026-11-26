@@ -1,0 +1,82 @@
+autoware_system_design_format: 0.3.0
+
+# node information
+name: TrajectorySelector.node
+
+package:
+  name: autoware_trajectory_selector
+  provider: autoware
+
+launch:
+  plugin: autoware::trajectory_selector::TrajectorySelectorNode
+  executable: autoware_trajectory_selector_node
+  node_output: both
+
+# interfaces
+subscribers:
+  - name: trajectories_generative
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: trajectories_backup
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: lanelet2_map
+    message_type: autoware_map_msgs/msg/LaneletMapBin
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: odometry
+    message_type: nav_msgs/msg/Odometry
+  - name: objects
+    message_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: diffusion/objects
+    message_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: acceleration
+    message_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: traffic_signals
+    message_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+  - name: route
+    message_type: autoware_planning_msgs/msg/LaneletRoute
+    qos:
+      reliability: reliable
+      durability: transient_local
+  - name: segmented_pointcloud
+    message_type: sensor_msgs/msg/PointCloud2
+    qos:
+      reliability: best_effort
+
+publishers:
+  - name: trajectory
+    message_type: autoware_planning_msgs/msg/Trajectory
+  - name: turn_indicators
+    message_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  # intermediate stages of concatenate, validate and rank
+  - name: concatenated_trajectories
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: validated_trajectories
+    message_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: scored_trajectories
+    message_type: autoware_internal_planning_msgs/msg/ScoredCandidateTrajectories
+
+# parameters
+# selector and concatenator parameters fall back to the defaults of their param/parameter_struct.yaml
+param_files:
+  - name: trajectory_validator_param
+    default: $(find-pkg-share autoware_trajectory_validator)/config/trajectory_validator.param.yaml
+  - name: trajectory_ranker_param
+    default: $(find-pkg-share autoware_trajectory_ranker)/config/trajectory_ranker.param.yaml
+  - name: validator_diagnostic_param
+    default: $(find-pkg-share autoware_trajectory_validator)/config/trajectory_validator_diagnostic.param.yaml
+
+param_values:
+  - name: pseudo_emergency_stop.enable
+    type: bool
+    default: false
+
+# processes
+processes:
+  - name: select_trajectory
+    trigger_conditions:
+      - on_input: trajectories_generative
+      - on_input: trajectories_backup
+    outcomes:
+      - to_output: trajectory
+      - to_output: turn_indicators
