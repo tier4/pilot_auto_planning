@@ -67,13 +67,13 @@ protected:
     params.ego_length = 0.825F;
     params.ego_width = 0.42F;
     params.ego_axle_to_box_center = 0.2F;
-    params.obstacle_collision_margin = 0.0F;
+    params.obstacle_collision_margin_lateral = 0.0F;
     params.road_border_collision_margin = 0.0F;
     params.lateral_boundary_barrier_weight =
       params.crash_contact_penalty /
       (params.lateral_boundary_soft_margin * params.lateral_boundary_soft_margin);
     params.obstacle_barrier_weight =
-      params.crash_contact_penalty / (params.obstacle_safe_margin * params.obstacle_safe_margin);
+      params.crash_contact_penalty / (params.obstacle_safe_margin_lateral * params.obstacle_safe_margin_lateral);
     params.road_border_barrier_weight =
       params.crash_contact_penalty /
       (params.road_border_safe_margin * params.road_border_safe_margin);
@@ -140,7 +140,7 @@ TEST(InterpolatedValidation, MovingObjectsUseTheSameFractionalTimeAsEgo)
   params.boundary_threshold = 100.0F;
   params.ego_length = params.ego_width = 0.2F;
   params.ego_axle_to_box_center = 0.0F;
-  params.obstacle_collision_margin = 0.0F;
+  params.obstacle_collision_margin_lateral = 0.0F;
   cost.setParams(params);
   std::array<float, kTestHorizon> x{}, y{}, yaw{};
   y.fill(2.0F);
@@ -165,7 +165,7 @@ TEST(ExactCollisionEligibility, ConservativeCircleContactKeepsSeparatedRectangle
   params.ego_length = 8.0F;
   params.ego_width = 2.0F;
   params.ego_axle_to_box_center = 0.0F;
-  params.obstacle_collision_margin = 0.2F;
+  params.obstacle_collision_margin_lateral = 0.2F;
   params.road_border_collision_margin = 0.2F;
   params.obstacle_barrier_weight = params.road_border_barrier_weight = 1000.0F;
   cost->setParams(params);
@@ -174,7 +174,7 @@ TEST(ExactCollisionEligibility, ConservativeCircleContactKeepsSeparatedRectangle
   cost->setRoadBorderSegments({Segment{-5.0F, 1.35F, 5.0F, 1.35F}});
   const float obstacle_distance = cost->distanceToClosestObstacle(0, 0, 0, 0);
   const float road_distance = cost->distanceToRoadBorder(0, 0, 0);
-  ASSERT_LE(obstacle_distance, params.obstacle_collision_margin);
+  ASSERT_LE(obstacle_distance, params.obstacle_collision_margin_lateral);
   ASSERT_LE(road_distance, params.road_border_collision_margin);
   ASSERT_FALSE(cost->egoIntersectsObstacleAtStep(0, 0, 0, 0));
   ASSERT_FALSE(cost->egoIntersectsRoadBorder(0, 0, 0));
@@ -188,7 +188,7 @@ TEST(ExactCollisionEligibility, ConservativeCircleContactKeepsSeparatedRectangle
   EXPECT_GT(road, 0.0F);
   EXPECT_FLOAT_EQ(
     obstacle, computeSmoothBarrierCost(
-                obstacle_distance, params.obstacle_collision_margin + params.obstacle_safe_margin,
+                obstacle_distance, params.obstacle_collision_margin_lateral + params.obstacle_safe_margin_lateral,
                 params.obstacle_barrier_weight));
   EXPECT_FLOAT_EQ(
     road, computeSmoothBarrierCost(
@@ -203,7 +203,7 @@ TEST(ExactCollisionEligibility, InflatedCornerContactBeyondOldThresholdIsRejecte
   params.ego_length = 8.0F;
   params.ego_width = 2.0F;
   params.ego_axle_to_box_center = 0.0F;
-  params.obstacle_collision_margin = params.road_border_collision_margin = 0.5F;
+  params.obstacle_collision_margin_lateral = params.road_border_collision_margin = 0.5F;
   params.obstacle_barrier_weight = params.road_border_barrier_weight = 1000.0F;
   cost->setParams(params);
   // The first obstacle is closer to a circle but does not intersect the rectangle.
@@ -211,7 +211,7 @@ TEST(ExactCollisionEligibility, InflatedCornerContactBeyondOldThresholdIsRejecte
   const float yaw[] = {0.0F, 0.0F}, half[] = {0.005F, 0.005F};
   cost->setOrientedBoxObstacles(x + 1, y + 1, yaw + 1, half + 1, half + 1, 1);
   cost->setRoadBorderSegments({Segment{4.48F, 1.49F, 4.49F, 1.48F}});
-  ASSERT_GT(cost->distanceToClosestObstacle(0, 0, 0, 0), params.obstacle_collision_margin);
+  ASSERT_GT(cost->distanceToClosestObstacle(0, 0, 0, 0), params.obstacle_collision_margin_lateral);
   ASSERT_GT(cost->distanceToRoadBorder(0, 0, 0), params.road_border_collision_margin);
   float drivable, obstacle, road;
   bool unsafe = false;
@@ -284,7 +284,7 @@ TEST_F(TrajectoryValidatorTest, TextureBroadPhaseEligibilityMatchesExactCollisio
   params.ego_length = 8.0F;
   params.ego_width = 2.0F;
   params.ego_axle_to_box_center = 0.0F;
-  params.obstacle_collision_margin = params.road_border_collision_margin = 0.5F;
+  params.obstacle_collision_margin_lateral = params.road_border_collision_margin = 0.5F;
   cost_->setParams(params);
   setStraightReference();
   const float x = 4.49F, y = 1.49F, yaw = 0.4F, half = 0.05F;
@@ -824,7 +824,7 @@ TEST_F(TrajectoryValidatorTest, SmoothBarrierCostRampsUpQuadratically)
     precomputed_weight * 0.25F);
 
   auto params = makeParams();
-  params.obstacle_safe_margin = safe_margin;
+  params.obstacle_safe_margin_lateral = safe_margin;
   params.obstacle_barrier_weight = precomputed_weight;
   cost_->setParams(params);
   setStraightReference();
@@ -917,7 +917,7 @@ TEST_F(TrajectoryValidatorTest, SmoothBarrierCostGrowsBeyondContactPenaltyForPen
   EXPECT_TRUE(std::isfinite(deep_penetration_cost));
 
   auto params = makeParams();
-  params.obstacle_safe_margin = safe_margin;
+  params.obstacle_safe_margin_lateral = safe_margin;
   params.obstacle_barrier_weight = precomputed_weight;
   params.crash_contact_penalty = nominal_contact_penalty;
   cost_->setParams(params);
@@ -946,7 +946,7 @@ TEST_F(TrajectoryValidatorTest, SmoothBarrierCostGrowsBeyondContactPenaltyForPen
 TEST_F(TrajectoryValidatorTest, GradualObstacleCostFromMovingObjects)
 {
   auto params = makeParams();
-  params.obstacle_safe_margin = 0.5F;
+  params.obstacle_safe_margin_lateral = 0.5F;
   params.obstacle_barrier_weight = 2000.0F;
   cost_->setParams(params);
   setStraightReference();
@@ -987,7 +987,7 @@ TEST_F(TrajectoryValidatorTest, GradualConstraintCostsAreIncludedInBreakdownTota
   params.lateral_acceleration_coeff = 0.0F;
   params.lateral_jerk_coeff = 0.0F;
   params.longitudinal_jerk_coeff = 0.0F;
-  params.obstacle_safe_margin = 0.5F;
+  params.obstacle_safe_margin_lateral = 0.5F;
   params.obstacle_barrier_weight = 2000.0F;
   params.road_border_safe_margin = 0.3F;
   params.road_border_barrier_weight = 2000.0F;
@@ -1123,7 +1123,7 @@ TEST_F(TrajectoryValidatorTest, ObstacleMarginInflatesTheEgoOrientedBox)
   const auto without_margin = detail::validateOptimizedTrajectory(*cost_, states);
   EXPECT_TRUE(without_margin.isValid());
 
-  params.obstacle_collision_margin = 0.2F;
+  params.obstacle_collision_margin_lateral = 0.2F;
   cost_->setParams(params);
   const auto with_margin = detail::validateOptimizedTrajectory(*cost_, states);
   EXPECT_FALSE(with_margin.isValid());
@@ -1283,6 +1283,121 @@ TEST_F(TrajectoryValidatorTest, PastPolylineEndUsesCrossTrackNotEndpointDistance
   past_end.y = 1.0F;
   EXPECT_NEAR(cost_->computeLateralDistanceValue(past_end.x, past_end.y), 1.0F, 1.0E-4F);
   EXPECT_FALSE(detail::validateOptimizedTrajectory(*cost_, {past_end}).isValid());
+}
+
+// Direction-dependent obstacle margins, measured in the obstacle's own box axes. These run on
+// the analytical host path, so no CUDA device is needed.
+class AnisotropicObstacleMargins : public ::testing::Test
+{
+protected:
+  static TestCostParams makeParams(
+    const float collision_lateral, const float collision_longitudinal, const float safe_lateral,
+    const float safe_longitudinal)
+  {
+    TestCostParams params;
+    params.ego_length = 1.0F;
+    params.ego_width = 1.0F;
+    params.ego_axle_to_box_center = 0.0F;
+    params.obstacle_collision_margin_lateral = collision_lateral;
+    params.obstacle_collision_margin_lateral_longitudinal = collision_longitudinal;
+    params.obstacle_safe_margin_lateral = safe_lateral;
+    params.obstacle_safe_margin_lateral_longitudinal = safe_longitudinal;
+    params.obstacle_barrier_weight = params.crash_contact_penalty;
+    return params;
+  }
+
+  static std::unique_ptr<TestCost> makeCost(
+    const TestCostParams & params, const float x, const float y, const float yaw)
+  {
+    auto cost = std::make_unique<TestCost>();
+    cost->setParams(params);
+    const float half = 0.2F;
+    cost->setOrientedBoxObstacles(&x, &y, &yaw, &half, &half, 1);
+    return cost;
+  }
+};
+
+TEST_F(AnisotropicObstacleMargins, CollisionZoneUsesTheObstacleAxes)
+{
+  // The ego box spans [-0.5, 0.5]^2 and the obstacle back face is at x = 1.0: a 0.5 m gap.
+  constexpr float kObstacleX = 1.2F;
+
+  // A longitudinal margin reaches the obstacle's back face; a lateral one does not.
+  EXPECT_TRUE(makeCost(makeParams(0.0F, 0.6F, 0.8F, 0.8F), kObstacleX, 0.0F, 0.0F)
+                ->egoIntersectsObstacleAtStep(0, 0, 0, 0));
+  EXPECT_FALSE(makeCost(makeParams(0.6F, 0.0F, 0.8F, 0.8F), kObstacleX, 0.0F, 0.0F)
+                 ->egoIntersectsObstacleAtStep(0, 0, 0, 0));
+
+  // Rotating the obstacle by 90 degrees swaps which margin faces the ego.
+  constexpr float kQuarterTurn = 1.5707964F;
+  EXPECT_FALSE(makeCost(makeParams(0.0F, 0.6F, 0.8F, 0.8F), kObstacleX, 0.0F, kQuarterTurn)
+                 ->egoIntersectsObstacleAtStep(0, 0, 0, 0));
+  EXPECT_TRUE(makeCost(makeParams(0.6F, 0.0F, 0.8F, 0.8F), kObstacleX, 0.0F, kQuarterTurn)
+                ->egoIntersectsObstacleAtStep(0, 0, 0, 0));
+}
+
+TEST_F(AnisotropicObstacleMargins, NegativeLongitudinalMarginInheritsLateral)
+{
+  const auto isotropic = makeParams(0.3F, -1.0F, 0.5F, -1.0F);
+  const auto explicit_equal = makeParams(0.3F, 0.3F, 0.5F, 0.5F);
+  for (const float obstacle_x : {0.8F, 1.1F, 1.6F}) {
+    auto inherited = makeCost(isotropic, obstacle_x, 0.3F, 0.4F);
+    auto equal = makeCost(explicit_equal, obstacle_x, 0.3F, 0.4F);
+    float drivable, inherited_cost, equal_cost;
+    float road = 0.0F;
+    inherited->computeGradualCrashCosts(0, 0, 0, 0, drivable, inherited_cost, road, nullptr, nullptr);
+    equal->computeGradualCrashCosts(0, 0, 0, 0, drivable, equal_cost, road, nullptr, nullptr);
+    EXPECT_FLOAT_EQ(inherited_cost, equal_cost);
+    EXPECT_EQ(
+      inherited->egoIntersectsObstacleAtStep(0, 0, 0, 0),
+      equal->egoIntersectsObstacleAtStep(0, 0, 0, 0));
+  }
+}
+
+TEST_F(AnisotropicObstacleMargins, SoftCostRampsPerAxisFromCollisionToSafe)
+{
+  // Ego is a 1x1 box at the origin (spine circle radius ~0.56). Obstacle half 0.2 at various
+  // poses. Longitudinal soft 1.0, lateral soft 0.2; collision 0.1 both ways.
+  const auto params = makeParams(0.1F, 0.1F, 0.2F, 1.0F);
+  const float penalty = params.crash_contact_penalty;
+
+  const auto soft_cost = [](TestCost & cost) {
+    float drivable, obstacle, road;
+    cost.computeGradualCrashCosts(0, 0, 0, 0, drivable, obstacle, road, nullptr, nullptr);
+    return obstacle;
+  };
+
+  // Far away: zero soft cost.
+  EXPECT_FLOAT_EQ(soft_cost(*makeCost(params, 5.0F, 0.0F, 0.0F)), 0.0F);
+
+  // Deep overlap: full penalty.
+  EXPECT_NEAR(soft_cost(*makeCost(params, 0.0F, 0.0F, 0.0F)), penalty, 1.0E-2F * penalty);
+
+  // Along the obstacle length the soft ramp is longer, so the same geometric gap past the
+  // collision boundary keeps more cost than the same gap past a side face.
+  auto ahead = makeCost(params, 1.2F, 0.0F, 0.0F);
+  auto abreast = makeCost(params, 0.0F, 1.2F, 0.0F);
+  EXPECT_GT(soft_cost(*ahead), soft_cost(*abreast));
+}
+
+TEST_F(AnisotropicObstacleMargins, RolloutSafetyFlagAgreesWithTheExactCollisionTest)
+{
+  // The broad phase must never hide a collision, whichever zone is larger.
+  for (const auto & params :
+       {makeParams(0.0F, 0.6F, 0.8F, 0.8F), makeParams(0.6F, 0.0F, 0.8F, 0.8F),
+        makeParams(0.05F, 0.6F, 0.2F, 0.7F)}) {
+    for (const float yaw : {0.0F, 0.6F, 1.5707964F}) {
+      for (const float obstacle_x : {0.9F, 1.0F, 1.2F, 1.4F}) {
+        auto cost = makeCost(params, obstacle_x, 0.2F, yaw);
+        float drivable, obstacle, road;
+        bool unsafe = false;
+        int status = 0;
+        cost->computeGradualCrashCosts(0, 0, 0, 0, drivable, obstacle, road, &unsafe, &status);
+        EXPECT_EQ(unsafe, cost->egoIntersectsObstacleAtStep(0, 0, 0, 0))
+          << "x=" << obstacle_x << " yaw=" << yaw;
+      }
+    }
+  }
 }
 
 }  // namespace

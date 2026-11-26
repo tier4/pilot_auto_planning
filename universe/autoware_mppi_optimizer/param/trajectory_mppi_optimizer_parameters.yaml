@@ -45,21 +45,10 @@ trajectory_mppi_optimizer:
     description: Minimum time in seconds to keep conditional MPPI active after the last matching input collision
     validation: { gt_eq<>: [0.0] }
     read_only: false
-  road_border_max_height_difference_m:
-    type: double
-    default_value: 2.5
-    description: Maximum allowed height difference between a road border and the closest trajectory point
-    validation: { gt_eq<>: [0.0] }
-    read_only: false
   limit_velocity_from_map:
     type: bool
     default_value: false
     description: Apply the lanelet velocity limit at each input reference trajectory point
-    read_only: false
-  limit_velocity_from_external:
-    type: bool
-    default_value: false
-    description: Apply the subscribed external velocity limit to MPPI
     read_only: false
   limit_velocity_from_map_debug_lanelet_ids:
     type: int_array
@@ -317,11 +306,20 @@ trajectory_mppi_optimizer:
     description: Lateral boundary soft margin in meters
     validation: { gt_eq<>: [0.0] }
     read_only: false
-  obstacle_collision_margin:
+  obstacle_collision_margin_lateral:
     type: double
     default_value: 0.2
-    description: Obstacle collision margin in meters
+    description: >-
+      Obstacle collision margin in meters on the obstacle's sides (lateral, in the obstacle's own
+      box axes). See obstacle_collision_margin_longitudinal for its front and back.
     validation: { gt_eq<>: [0.0] }
+    read_only: false
+  obstacle_collision_margin_longitudinal:
+    type: double
+    default_value: -1.0
+    description: >-
+      Obstacle collision margin in meters along the obstacle's heading (its front and back). A
+      negative value means use obstacle_collision_margin_lateral.
     read_only: false
   road_border_collision_margin:
     type: double
@@ -329,11 +327,20 @@ trajectory_mppi_optimizer:
     description: Road border collision margin in meters
     validation: { gt_eq<>: [0.0] }
     read_only: false
-  obstacle_safe_margin:
+  obstacle_safe_margin_lateral:
     type: double
     default_value: 0.4
-    description: Obstacle safety margin in meters
+    description: >-
+      Obstacle safety margin in meters on the obstacle's sides (lateral, in the obstacle's own box
+      axes). See obstacle_safe_margin_longitudinal for its front and back.
     validation: { gt_eq<>: [0.0] }
+    read_only: false
+  obstacle_safe_margin_longitudinal:
+    type: double
+    default_value: -1.0
+    description: >-
+      Obstacle safety margin in meters along the obstacle's heading (its front and back). A
+      negative value means use obstacle_safe_margin_lateral.
     read_only: false
   use_vegetation_pointcloud:
     type: bool
@@ -435,12 +442,6 @@ trajectory_mppi_optimizer:
     description: Minimum input arc length for optimization
     validation: { gt_eq<>: [0.0] }
     read_only: false
-  validation_interpolation_substeps:
-    type: int
-    default_value: 1
-    description: Subdivisions between optimized post-step poses for final validation; 1 disables interpolation, moving objects are interpolated at the same times
-    validation: { bounds<>: [1, 100] }
-    read_only: false
   steering_hold_reference_length_threshold_m:
     type: double
     default_value: 0.5
@@ -482,6 +483,11 @@ trajectory_mppi_optimizer:
     default_value: 0.5
     description: Absolute velocity where restart steering protection is fully released
     validation: { gt_eq<>: [0.0] }
+    read_only: false
+  use_temporal_mpt_as_nominal:
+    type: bool
+    default_value: false
+    description: Seed the nominal control with temporal MPT
     read_only: false
   use_last_control_as_nominal:
     type: bool
@@ -559,6 +565,29 @@ trajectory_mppi_optimizer:
     description: Absolute ego velocity at which warm-start reuse leaves the stopped state
     validation: { gt_eq<>: [0.0] }
     read_only: false
+  enable_curvature_adaptive_steering_filter:
+    type: bool
+    default_value: true
+    description: Apply the plugin output steering EMA that filters straight-line noise and responds faster in turns
+    read_only: false
+  steering_filter_alpha_straight:
+    type: double
+    default_value: 0.1
+    description: Steering EMA alpha at zero preceding filtered steering; lower values suppress more straight-line noise
+    validation: { bounds<>: [0.0, 1.0] }
+    read_only: false
+  steering_filter_alpha_turn:
+    type: double
+    default_value: 0.5
+    description: Steering EMA alpha at and above the turn-angle threshold; keep below 1 to smooth turns and reversals
+    validation: { bounds<>: [0.0, 1.0] }
+    read_only: false
+  steering_filter_turn_angle_rad:
+    type: double
+    default_value: 0.1
+    description: Absolute preceding filtered steering in radians at which the EMA reaches its turn alpha
+    validation: { gt<>: [0.0] }
+    read_only: false
   enable_debug_trajectory_log:
     type: bool
     default_value: false
@@ -581,8 +610,7 @@ trajectory_mppi_optimizer:
   enable_obstacle_costmap_debug:
     type: bool
     default_value: false
-    description: >-
-      Copy one slice of the obstacle distance texture to the host and publish it as a heatmap
+    description: >-      Copy one slice of the obstacle distance texture to the host and publish it as a heatmap
       (nav_msgs/OccupancyGrid, axis-aligned, centered on the reference path). The copy is queued
       on the rollout stream, adds no synchronization point, and is skipped while the texture is
       unchanged.

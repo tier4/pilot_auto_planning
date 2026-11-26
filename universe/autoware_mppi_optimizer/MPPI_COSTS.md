@@ -376,20 +376,43 @@ between optimized GPU costs and the reconstructed breakdown are expected.
 
 ### 9.1 Obstacle barrier
 
-`d_obstacle` is the minimum signed clearance from the four-circle ego approximation to the closest
-oriented obstacle box at stage `k`:
+Soft obstacle cost is an anisotropic shell in the obstacle's box axes. Soft violation `v ∈ [0, 1]` is
+1 at/inside the collision-inflated box and 0 at/outside the soft-outer box; between those faces it
+falls off using each axis's own safe margin. With ego footprint circle radius folded into the
+collision margins:
 
 ```text
-L_obstacle = W_obstacle *
-             [obstacle_collision_margin + obstacle_safe_margin - d_obstacle]_+^2
-
-W_obstacle = crash_contact_penalty / max(obstacle_safe_margin, 1e-3)^2
+L_obstacle = crash_contact_penalty * v^2
 ```
 
-The cost begins outside the circle-based collision envelope, equals `crash_contact_penalty` when
-circle-based clearance reaches `obstacle_collision_margin`, and grows beyond that value during overlap. Static
-and time-varying obstacle trajectories both participate. The implementation stores at most 64
-obstacles.
+The cost equals `crash_contact_penalty` on the collision boundary and is zero beyond each axis's
+safe margin. Static and time-varying obstacle trajectories both participate. The implementation
+stores at most 64 obstacles.
+
+#### Lateral and longitudinal margins
+
+The obstacle margins can differ along the obstacle's own box axes. `obstacle_collision_margin_lateral` and
+`obstacle_safe_margin_lateral` apply to the obstacle's sides (lateral); `obstacle_collision_margin_longitudinal`
+and `obstacle_safe_margin_longitudinal` apply to its front and back, along its heading. A negative
+longitudinal value means "same as lateral". The ego margin itself is not directional; only the obstacle's
+frame is.
+
+Soft cost is an anisotropic shell around the collision-inflated box. With ego footprint circle radius
+`r` folded into the collision margins (Minkowski sum with a disk, rectangularly expanded):
+
+```text
+collision box   half extents (hl + collision_lon + r, hw + collision_lat + r)
+soft outer box  half extents (collision + safe_lon, collision + safe_lat) along each axis
+v               soft violation in [0, 1]: 1 inside the collision box, 0 outside the soft outer box,
+                and 1 - max(overshoot_lon / safe_lon, overshoot_lat / safe_lat) in between
+L_obstacle    = crash_contact_penalty * v^2
+```
+
+Each face therefore ramps from full penalty at its collision boundary down to zero at its own safe
+margin. The collision test (rollout safety flag, `validateOptimizedTrajectory()`, and the input
+collision gate) is separate: the ego box is inflated by `min(collision_lon, collision_lat)` and the
+obstacle box is grown by the remaining collision extras. The debug obstacle costmap shows `v`
+directly (heat 100 at the collision boundary, 0 at the soft outer box).
 
 The runtime parameter `dynamic_obstacle_horizon_s` limits how far into the future moving
 objects participate in obstacle costs and final OBB collision validation. Its default, `0.0`,
@@ -485,7 +508,7 @@ After optimization and post-processing, `validateOptimizedTrajectory()` rejects 
 trajectory at the first state that has any of these conditions:
 
 - `|e_lat| >= boundary_threshold`;
-- ego OBB (inflated by `obstacle_collision_margin`) overlaps an obstacle OBB;
+- ego OBB (inflated by `obstacle_collision_margin_lateral`) overlaps an obstacle OBB;
 - ego OBB (inflated by `road_border_collision_margin`) intersects a road-border segment;
 - velocity is negative.
 

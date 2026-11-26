@@ -214,12 +214,16 @@ void applyCostParam(
     params.lateral_jerk_coeff = value;
   } else if (key == "longitudinal_jerk_coeff") {
     params.longitudinal_jerk_coeff = value;
-  } else if (key == "obstacle_collision_margin") {
-    params.obstacle_collision_margin = value;
+  } else if (key == "obstacle_collision_margin_lateral") {
+    params.obstacle_collision_margin_lateral = value;
+  } else if (key == "obstacle_collision_margin_longitudinal") {
+    params.obstacle_collision_margin_longitudinal = value;
   } else if (key == "road_border_collision_margin") {
     params.road_border_collision_margin = value;
-  } else if (key == "obstacle_safe_margin") {
-    params.obstacle_safe_margin = value;
+  } else if (key == "obstacle_safe_margin_lateral") {
+    params.obstacle_safe_margin_lateral = value;
+  } else if (key == "obstacle_safe_margin_longitudinal") {
+    params.obstacle_safe_margin_longitudinal = value;
   } else if (key == "road_border_safe_margin") {
     params.road_border_safe_margin = value;
   } else if (key == "drivable_area_safe_margin") {

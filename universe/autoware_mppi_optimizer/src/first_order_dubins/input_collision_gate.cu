@@ -131,23 +131,30 @@ bool intersects_road_border(
 
 bool intersects_static_object(
   const Pose2d & pose, const std::vector<StaticObstacle> & objects,
-  const FirstOrderDubinsMppiVehicleParams & vehicle, const float margin)
+  const FirstOrderDubinsMppiVehicleParams & vehicle, const ObstacleMargin & margin)
 {
   if (objects.empty()) return false;
   const float cos_yaw = std::cos(pose.yaw);
   const float sin_yaw = std::sin(pose.yaw);
   const float center_x = pose.x + vehicle.ego_axle_to_box_center * cos_yaw;
   const float center_y = pose.y + vehicle.ego_axle_to_box_center * sin_yaw;
+  // Same split as the optimizer's collision check: the ego box is inflated by the smaller margin
+  // and each obstacle is grown along its own axes by the remainder.
+  const float ego_margin = std::min(margin.lateral, margin.longitudinal);
+  const float obstacle_length_growth = margin.longitudinal - ego_margin;
+  const float obstacle_width_growth = margin.lateral - ego_margin;
   for (const auto & object : objects) {
     if (mppi::cost::detail::orientedBoxesOverlap(
-          center_x, center_y, cos_yaw, sin_yaw, vehicle.ego_length * 0.5F + margin,
-          vehicle.ego_width * 0.5F + margin, object.x, object.y, object.cos_yaw, object.sin_yaw,
-          object.half_length, object.half_width)) {
+          center_x, center_y, cos_yaw, sin_yaw, vehicle.ego_length * 0.5F + ego_margin,
+          vehicle.ego_width * 0.5F + ego_margin, object.x, object.y, object.cos_yaw,
+          object.sin_yaw, object.half_length + obstacle_length_growth,
+          object.half_width + obstacle_width_growth)) {
       return true;
     }
   }
   return false;
 }
+
 
 bool intersects_vegetation(
   const Pose2d & pose, const std::vector<VegetationPoint> & points,
@@ -175,7 +182,7 @@ bool intersects_vegetation(
 void check_pose(
   const Pose2d & pose, const RoadSegments & segments, const std::vector<StaticObstacle> & objects,
   const std::vector<VegetationPoint> & vegetation_points,
-  const FirstOrderDubinsMppiVehicleParams & vehicle, const float obstacle_margin,
+  const FirstOrderDubinsMppiVehicleParams & vehicle, const ObstacleMargin & obstacle_margin,
   const float border_margin, const float vegetation_margin,
   const InputCollisionConditions conditions, InputCollisionResult & result)
 {
@@ -208,14 +215,15 @@ std::size_t interpolation_steps(
 }
 
 void validate_geometry(
-  const FirstOrderDubinsMppiVehicleParams & vehicle, const float obstacle_margin,
+  const FirstOrderDubinsMppiVehicleParams & vehicle, const ObstacleMargin & obstacle_margin,
   const float border_margin)
 {
   if (
     !std::isfinite(vehicle.ego_length) || vehicle.ego_length <= 0.0F ||
     !std::isfinite(vehicle.ego_width) || vehicle.ego_width <= 0.0F ||
-    !std::isfinite(vehicle.ego_axle_to_box_center) || !std::isfinite(obstacle_margin) ||
-    obstacle_margin < 0.0F || !std::isfinite(border_margin) || border_margin < 0.0F) {
+    !std::isfinite(vehicle.ego_axle_to_box_center) || !std::isfinite(obstacle_margin.lateral) ||
+    obstacle_margin.lateral < 0.0F || !std::isfinite(obstacle_margin.longitudinal) ||
+    obstacle_margin.longitudinal < 0.0F || !std::isfinite(border_margin) || border_margin < 0.0F) {
     throw std::invalid_argument("MPPI input collision gate received invalid vehicle geometry");
   }
 }
@@ -226,7 +234,7 @@ InputCollisionResult checkInputTrajectoryCollisions(
   const autoware_planning_msgs::msg::Trajectory & trajectory,
   const autoware_perception_msgs::msg::TrackedObjects & static_objects,
   const std::vector<Segment> & road_borders, const FirstOrderDubinsMppiVehicleParams & vehicle,
-  const float obstacle_margin, const float road_border_margin,
+  const ObstacleMargin obstacle_margin, const float road_border_margin,
   const InputCollisionConditions conditions, const std::vector<VegetationPoint> & vegetation_points,
   const float vegetation_margin)
 {

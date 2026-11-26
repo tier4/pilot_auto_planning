@@ -94,10 +94,16 @@ void declare_first_order_dubins_mppi_cost_params(rclcpp::Node & node, const std:
   node.declare_parameter(
     param_name(prefix, "longitudinal_jerk_coeff"), defaults.longitudinal_jerk_coeff);
   node.declare_parameter(
-    param_name(prefix, "obstacle_collision_margin"), defaults.obstacle_collision_margin);
+    param_name(prefix, "obstacle_collision_margin_lateral"), defaults.obstacle_collision_margin_lateral);
+  node.declare_parameter(
+    param_name(prefix, "obstacle_collision_margin_longitudinal"),
+    defaults.obstacle_collision_margin_longitudinal);
   node.declare_parameter(
     param_name(prefix, "road_border_collision_margin"), defaults.road_border_collision_margin);
-  node.declare_parameter(param_name(prefix, "obstacle_safe_margin"), defaults.obstacle_safe_margin);
+  node.declare_parameter(param_name(prefix, "obstacle_safe_margin_lateral"), defaults.obstacle_safe_margin_lateral);
+  node.declare_parameter(
+    param_name(prefix, "obstacle_safe_margin_longitudinal"),
+    defaults.obstacle_safe_margin_longitudinal);
   node.declare_parameter(
     param_name(prefix, "vegetation_collision_margin"), defaults.vegetation_collision_margin);
   node.declare_parameter(
@@ -200,12 +206,16 @@ FirstOrderDubinsMppiCostParams get_first_order_dubins_mppi_cost_params(
     static_cast<float>(node.get_parameter(param_name(prefix, "lateral_jerk_coeff")).as_double());
   params.longitudinal_jerk_coeff = static_cast<float>(
     node.get_parameter(param_name(prefix, "longitudinal_jerk_coeff")).as_double());
-  params.obstacle_collision_margin = static_cast<float>(
-    node.get_parameter(param_name(prefix, "obstacle_collision_margin")).as_double());
+  params.obstacle_collision_margin_lateral = static_cast<float>(
+    node.get_parameter(param_name(prefix, "obstacle_collision_margin_lateral")).as_double());
+  params.obstacle_collision_margin_longitudinal = static_cast<float>(
+    node.get_parameter(param_name(prefix, "obstacle_collision_margin_longitudinal")).as_double());
   params.road_border_collision_margin = static_cast<float>(
     node.get_parameter(param_name(prefix, "road_border_collision_margin")).as_double());
-  params.obstacle_safe_margin =
-    static_cast<float>(node.get_parameter(param_name(prefix, "obstacle_safe_margin")).as_double());
+  params.obstacle_safe_margin_lateral =
+    static_cast<float>(node.get_parameter(param_name(prefix, "obstacle_safe_margin_lateral")).as_double());
+  params.obstacle_safe_margin_longitudinal = static_cast<float>(
+    node.get_parameter(param_name(prefix, "obstacle_safe_margin_longitudinal")).as_double());
   params.vegetation_collision_margin = static_cast<float>(
     node.get_parameter(param_name(prefix, "vegetation_collision_margin")).as_double());
   params.vegetation_safe_margin = static_cast<float>(

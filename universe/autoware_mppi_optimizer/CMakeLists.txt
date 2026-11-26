@@ -34,6 +34,13 @@ if(BUILD_TESTING)
   set_target_properties(test_path_tracking_geometry PROPERTIES CXX_STANDARD 17)
   set_tests_properties(test_path_tracking_geometry PROPERTIES LABELS "cost;unit" TIMEOUT 30)
 
+  ament_add_gtest(test_obstacle_margin_profile
+    test/test_obstacle_margin_profile.cpp
+  )
+  target_include_directories(test_obstacle_margin_profile PRIVATE include)
+  set_target_properties(test_obstacle_margin_profile PROPERTIES CXX_STANDARD 17)
+  set_tests_properties(test_obstacle_margin_profile PROPERTIES LABELS "cost;unit" TIMEOUT 30)
+
   ament_add_gtest(test_preferred_lane_centerline test/test_preferred_lane_centerline.cpp)
   target_link_libraries(test_preferred_lane_centerline mppi_trajectory_utils)
   set_target_properties(test_preferred_lane_centerline PROPERTIES CXX_STANDARD 17)

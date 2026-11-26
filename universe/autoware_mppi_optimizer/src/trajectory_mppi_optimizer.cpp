@@ -58,6 +58,12 @@ using autoware::trajectory_modifier::plugin::ProcessingResult;
 using autoware_planning_msgs::msg::Trajectory;
 using autoware_utils_geometry::Segment2d;
 
+/** A negative longitudinal margin inherits the lateral one. */
+double resolve_longitudinal_margin(const double lateral, const double longitudinal)
+{
+  return longitudinal < 0.0 ? lateral : longitudinal;
+}
+
 double squared_distance_to_reference(
   const double x, const double y, const autoware_planning_msgs::msg::Trajectory & trajectory,
   const std::size_t count)
@@ -148,10 +154,26 @@ void validate_cost_parameter_combinations(const trajectory_mppi_optimizer::Param
   if (params.max_iter < 1 || params.max_iter > kMaxMppiIterations) {
     throw std::invalid_argument("mppi_optimizer.max_iter must be in [1, 100]");
   }
-  if (params.obstacle_safe_margin < params.obstacle_collision_margin) {
+  if (params.obstacle_safe_margin_lateral < params.obstacle_collision_margin_lateral) {
     throw std::invalid_argument(
-      "mppi_optimizer.obstacle_safe_margin must be greater than or equal to "
-      "mppi_optimizer.obstacle_collision_margin");
+      "mppi_optimizer.obstacle_safe_margin_lateral must be greater than or equal to "
+      "mppi_optimizer.obstacle_collision_margin_lateral");
+  }
+  if (
+    !std::isfinite(params.obstacle_collision_margin_longitudinal) ||
+    !std::isfinite(params.obstacle_safe_margin_longitudinal)) {
+    throw std::invalid_argument(
+      "mppi_optimizer.obstacle_{collision,safe}_margin_longitudinal must be finite");
+  }
+  if (
+    resolve_longitudinal_margin(
+      params.obstacle_safe_margin_lateral, params.obstacle_safe_margin_longitudinal) <
+    resolve_longitudinal_margin(
+      params.obstacle_collision_margin_lateral, params.obstacle_collision_margin_longitudinal)) {
+    throw std::invalid_argument(
+      "mppi_optimizer.obstacle_safe_margin_longitudinal must be greater than or equal to "
+      "mppi_optimizer.obstacle_collision_margin_longitudinal (a negative value inherits the "
+      "lateral margin)");
   }
   if (params.road_border_safe_margin < params.road_border_collision_margin) {
     throw std::invalid_argument(
@@ -222,9 +244,13 @@ FirstOrderDubinsMppiCostParams make_cost_params(const trajectory_mppi_optimizer:
   output.lateral_acceleration_coeff = static_cast<float>(params.lateral_acceleration_coeff);
   output.lateral_jerk_coeff = static_cast<float>(params.lateral_jerk_coeff);
   output.longitudinal_jerk_coeff = static_cast<float>(params.longitudinal_jerk_coeff);
-  output.obstacle_collision_margin = static_cast<float>(params.obstacle_collision_margin);
+  output.obstacle_collision_margin_lateral = static_cast<float>(params.obstacle_collision_margin_lateral);
+  output.obstacle_collision_margin_longitudinal =
+    static_cast<float>(params.obstacle_collision_margin_longitudinal);
   output.road_border_collision_margin = static_cast<float>(params.road_border_collision_margin);
-  output.obstacle_safe_margin = static_cast<float>(params.obstacle_safe_margin);
+  output.obstacle_safe_margin_lateral = static_cast<float>(params.obstacle_safe_margin_lateral);
+  output.obstacle_safe_margin_longitudinal =
+    static_cast<float>(params.obstacle_safe_margin_longitudinal);
   output.vegetation_collision_margin = static_cast<float>(params.vegetation_collision_margin);
   output.vegetation_safe_margin = static_cast<float>(params.vegetation_safe_margin);
   output.road_border_safe_margin = static_cast<float>(params.road_border_safe_margin);
@@ -342,6 +368,22 @@ float input_activation_margin(
   return static_cast<float>(margin);
 }
 
+
+/** Obstacle activation margin per obstacle axis: lateral (sides) and longitudinal (front/back). */
+ObstacleMargin input_activation_obstacle_margin(const trajectory_mppi_optimizer::Params & params)
+{
+  return ObstacleMargin{
+    input_activation_margin(
+      params.obstacle_collision_margin_lateral, params.obstacle_safe_margin_lateral,
+      params.use_soft_margins_for_input_collision),
+    input_activation_margin(
+      resolve_longitudinal_margin(
+        params.obstacle_collision_margin_lateral, params.obstacle_collision_margin_longitudinal),
+      resolve_longitudinal_margin(
+        params.obstacle_safe_margin_lateral, params.obstacle_safe_margin_longitudinal),
+      params.use_soft_margins_for_input_collision)};
+}
+
 InputCollisionResult check_input_collision_triggers(
   const Trajectory & input, const TrackedObjects & static_objects,
   const std::vector<Segment> & road_borders, const std::vector<VegetationPoint> & vegetation_points,
@@ -368,9 +410,7 @@ InputCollisionResult check_input_collision_triggers(
 
   const auto collision = checkInputTrajectoryCollisions(
     input, static_objects, road_borders, vehicle,
-    input_activation_margin(
-      params.obstacle_collision_margin, params.obstacle_safe_margin,
-      params.use_soft_margins_for_input_collision),
+    input_activation_obstacle_margin(params),
     input_activation_margin(
       params.road_border_collision_margin, params.road_border_safe_margin,
       params.use_soft_margins_for_input_collision),
@@ -1046,11 +1086,19 @@ void TrajectoryMppiOptimizer::prepare_scene_parameters()
   const double max_lateral_offset = std::max(
     std::abs(context_->vehicle_info.min_lateral_offset_m),
     std::abs(context_->vehicle_info.max_lateral_offset_m));
+  // The object filter is radial, so bound the direction-dependent margins by their larger axis.
+  const double max_collision_margin = std::max(
+    static_cast<double>(cost_params.obstacle_collision_margin_lateral),
+    resolve_longitudinal_margin(
+      cost_params.obstacle_collision_margin_lateral, cost_params.obstacle_collision_margin_longitudinal));
+  const double max_safe_margin = std::max(
+    static_cast<double>(cost_params.obstacle_safe_margin_lateral),
+    resolve_longitudinal_margin(
+      cost_params.obstacle_safe_margin_lateral, cost_params.obstacle_safe_margin_longitudinal));
   const double collision_envelope_radius = std::hypot(
-    max_longitudinal_offset + cost_params.obstacle_collision_margin,
-    max_lateral_offset + cost_params.obstacle_collision_margin);
+    max_longitudinal_offset + max_collision_margin, max_lateral_offset + max_collision_margin);
   const double barrier_envelope_radius =
-    std::hypot(max_longitudinal_offset, max_lateral_offset) + cost_params.obstacle_safe_margin;
+    std::hypot(max_longitudinal_offset, max_lateral_offset) + max_safe_margin;
   object_filter_margin_m_ = std::max(collision_envelope_radius, barrier_envelope_radius);
   vegetation_filter_margin_m_ = std::hypot(max_longitudinal_offset, max_lateral_offset) +
                                 static_cast<double>(cost_params.vegetation_collision_margin) +
@@ -1059,9 +1107,10 @@ void TrajectoryMppiOptimizer::prepare_scene_parameters()
   if (
     params_.optimize_only_on_input_collision && params_.trigger_on_static_object_collision &&
     params_.use_soft_margins_for_input_collision) {
-    const double activation_margin = input_activation_margin(
-      params_.obstacle_collision_margin, params_.obstacle_safe_margin,
-      params_.use_soft_margins_for_input_collision);
+    const auto obstacle_activation_margin = input_activation_obstacle_margin(params_);
+    const double activation_margin = std::max(
+      static_cast<double>(obstacle_activation_margin.lateral),
+      static_cast<double>(obstacle_activation_margin.longitudinal));
     const double activation_envelope_radius = std::hypot(
       max_longitudinal_offset + activation_margin, max_lateral_offset + activation_margin);
     object_filter_margin_m_ = std::max(object_filter_margin_m_, activation_envelope_radius);

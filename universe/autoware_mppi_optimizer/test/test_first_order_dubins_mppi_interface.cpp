@@ -189,7 +189,7 @@ TEST(FirstOrderDubinsMppiInterface, RejectsUnsafeCostParametersBeforeCudaSetup)
   EXPECT_THROW(validateFirstOrderDubinsMppiCostParams(params), std::invalid_argument);
 
   params = {};
-  params.obstacle_safe_margin = params.obstacle_collision_margin - 0.1F;
+  params.obstacle_safe_margin_lateral = params.obstacle_collision_margin_lateral - 0.1F;
   EXPECT_THROW(validateFirstOrderDubinsMppiCostParams(params), std::invalid_argument);
 
   params = {};
@@ -1602,7 +1602,7 @@ TEST_F(FirstOrderDubinsMppiInterfaceGpuTest, RejectsObjectInsideConfiguredMargin
 {
   FirstOrderDubinsMppiCostParams cost_params;
   cost_params.boundary_threshold = 100.0F;
-  cost_params.obstacle_collision_margin = 0.2F;
+  cost_params.obstacle_collision_margin_lateral = 0.2F;
   interface_->setCostParams(cost_params);
   FirstOrderDubinsMppiRuntimeOptions options;
   options.skip_if_invalid = true;

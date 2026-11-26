@@ -400,7 +400,7 @@ TEST_F(CostEvaluation, GeometryClearanceSweeps)
                           : kind == 2 ? "drivable_area"
                                       : "corner_buffer";
       params.*weight = w;
-      params.obstacle_safe_margin = 1;
+      params.obstacle_safe_margin_lateral = 1;
       params.road_border_safe_margin = 1;
       params.drivable_area_safe_margin = 1;
       params.corner_safe_margin = 1;
@@ -439,12 +439,12 @@ TEST_F(CostEvaluation, CollisionMarginRotationAndMovingObstacleTiming)
   auto y = Cost::output_array::Zero().eval();
   auto u = Cost::control_array::Zero().eval();
   params.obstacle_barrier_weight = 1;
-  params.obstacle_safe_margin = 1;
+  params.obstacle_safe_margin_lateral = 1;
   apply();
   const float radius = std::sqrt(1.25F), clearance = 0.5F;
   obstacle(0, radius + clearance + 0.5F, 0, 10, 0.5F);
   expected(record(y, u, 0, "zero collision margin"), &Breakdown::obstacle, "obstacle", 0.25);
-  params.obstacle_collision_margin = 0.2F;
+  params.obstacle_collision_margin_lateral = 0.2F;
   apply();
   expected(record(y, u, 0, "inflated collision margin"), &Breakdown::obstacle, "obstacle", 0.49);
   // Rotate both ego and scene 90 degrees: clearance and cost must be invariant.
@@ -940,7 +940,7 @@ TEST_F(GpuCostEvaluation, ZeroSoftWeightsStillReportExactSafetyViolations)
   params.boundary_threshold = 0.5F;
   params.ego_length = params.ego_width = 1.0F;
   params.ego_axle_to_box_center = 0.0F;
-  params.obstacle_collision_margin = params.road_border_collision_margin = 0.0F;
+  params.obstacle_collision_margin_lateral = params.road_border_collision_margin = 0.0F;
   apply();
   obstacle(0.0F, 1.0F);
   cost->setRoadBorderSegments({{-1.0, 1.0, 1.0, 1.0}});
@@ -1170,7 +1170,7 @@ TEST_F(GpuCostEvaluation, TextureGeometryCostsMatchWithinResolutionBound)
 {
   params.obstacle_barrier_weight = params.road_border_barrier_weight =
     params.drivable_area_barrier_weight = params.corner_buffer_coeff = 1;
-  params.obstacle_safe_margin = params.road_border_safe_margin = params.drivable_area_safe_margin =
+  params.obstacle_safe_margin_lateral = params.road_border_safe_margin = params.drivable_area_safe_margin =
     params.corner_safe_margin = 2;
   apply();
   cost->setRoadBorderSegments({Segment{-20, 2, 40, 2}});
@@ -1195,7 +1195,7 @@ TEST_F(GpuCostEvaluation, TextureGeometryCostsMatchWithinResolutionBound)
 TEST_F(GpuCostEvaluation, MovingObstacleTextureUsesRequestedTimestep)
 {
   params.obstacle_barrier_weight = 1;
-  params.obstacle_safe_margin = 1;
+  params.obstacle_safe_margin_lateral = 1;
   apply();
   std::array<float, H> x{}, oy{}, yaw{};
   for (int t = 0; t < H; ++t)
