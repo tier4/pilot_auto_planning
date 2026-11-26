@@ -26,7 +26,6 @@ struct alignas(8) DistanceMapTextureGrid
   int time_steps = 0;
 };
 
-class DistanceMapTextureVisualizer;
 struct DistanceMapTextureTestAccess;
 
 inline constexpr float kDistanceMapEmptyDistance = 1.0E8F;
@@ -34,8 +33,8 @@ inline constexpr int kEgoSpineCircleCount = 4;
 
 /**
  * Trivially-copyable texture state embedded in the hybrid host/device cost object.
- * Device code reads the grids, texture handles, and validity flags. CUDA arrays, surfaces, and
- * the raw visualizer pointer are host-owned but remain POD so copying the cost object is safe.
+ * Device code reads the grids, texture handles, and validity flags. CUDA arrays and surfaces are
+ * host-owned but remain POD so copying the cost object is safe.
  */
 struct alignas(16) DistanceMapTextureState
 {
@@ -76,8 +75,6 @@ struct alignas(16) DistanceMapTextureState
   cudaSurfaceObject_t static_distance_surface_ = 0;
   cudaSurfaceObject_t obstacle_distance_surface_ = 0;
   cudaSurfaceObject_t nearest_segment_surface_ = 0;
-  DistanceMapTextureVisualizer * distance_map_visualizer_ = nullptr;
-  bool static_distance_visualization_dirty_ = true;
 };
 
 static_assert(
@@ -88,18 +85,6 @@ static_assert(
   "DistanceMapTextureState must have the same standard layout in host and device code");
 static_assert(
   alignof(DistanceMapTextureState) >= 16, "DistanceMapTextureState must remain 16-byte aligned");
-
-__host__ void configureDistanceMapTextureVisualizer(
-  DistanceMapTextureVisualizer *& visualizer, bool enable, int static_width, int static_height,
-  int obstacle_width, int obstacle_height, int time_steps);
-
-/** Returns true when a visualization frame was attempted. */
-__host__ bool renderDistanceMapTextureVisualizer(
-  DistanceMapTextureVisualizer *& visualizer, cudaTextureObject_t static_texture,
-  cudaTextureObject_t obstacle_texture, bool road_border_valid, bool drivable_area_valid,
-  bool obstacle_valid, bool obstacle_has_obstacles, float road_border_margin,
-  float drivable_area_margin, float obstacle_margin, float static_resolution,
-  float obstacle_resolution, cudaStream_t producer_stream, bool update_static);
 
 __host__ __device__ inline void computeEgoSpineCircles(
   const float center_x, const float center_y, const float cos_yaw, const float sin_yaw,

@@ -39,6 +39,11 @@ if(BUILD_TESTING)
   set_target_properties(test_preferred_lane_centerline PROPERTIES CXX_STANDARD 17)
   set_tests_properties(test_preferred_lane_centerline PROPERTIES LABELS "cost;unit" TIMEOUT 30)
 
+  ament_add_gtest(test_mppi_costmap_grid test/test_mppi_costmap_grid.cpp)
+  target_link_libraries(test_mppi_costmap_grid mppi_trajectory_utils)
+  set_target_properties(test_mppi_costmap_grid PROPERTIES CXX_STANDARD 17)
+  set_tests_properties(test_mppi_costmap_grid PROPERTIES LABELS "cpu;unit" TIMEOUT 30)
+
   ament_add_gtest(test_mppi_trajectory_utils
     test/test_trajectory_utils.cpp
   )
@@ -244,7 +249,6 @@ if(CUDA_AVAIL)
   message(STATUS "MPPI CUDA architecture(s): ${MPPI_CUDA_ARCH_FLAGS}")
 
   cuda_add_library(first_order_dubins_mppi SHARED
-    src/first_order_dubins/distance_map_texture_visualizer.cu
     src/first_order_dubins/first_order_dubins_mppi_interface.cu
     src/first_order_dubins/input_collision_gate.cu
   )
@@ -264,8 +268,6 @@ if(CUDA_AVAIL)
     autoware_vehicle_msgs::autoware_vehicle_msgs__rosidl_generator_cpp
     geometry_msgs::geometry_msgs__rosidl_generator_cpp
     nav_msgs::nav_msgs__rosidl_generator_cpp
-    OpenGL::GL
-    glfw
     ${CUDA_cufft_LIBRARY}
   )
   mppi_link_acados_runtime(first_order_dubins_mppi)
@@ -522,6 +524,6 @@ endif()
 ament_export_include_directories(include)
 if(CUDA_AVAIL)
   ament_export_libraries(first_order_dubins_mppi)
-  ament_export_dependencies(MPPI-Generic OpenGL glfw3)
+  ament_export_dependencies(MPPI-Generic)
 endif()
 ament_auto_package(INSTALL_TO_SHARE config)

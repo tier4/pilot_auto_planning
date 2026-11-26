@@ -685,14 +685,14 @@ divides those sums by the total rollout count rather than the finite rollout cou
 change the rollout weights or any cost term, but it biases free-energy variance telemetry whenever
 some rollouts are non-finite.
 
-### 14.9 The distance-map viewer is not a direct cost visualization
+### 14.9 The RViz costmaps apply the footprint-level barrier to the raw fields
 
-The OpenGL viewer displays point-to-segment/OBB texture values. The rollout cost subsequently
-accounts for the ego circle radius and, for obstacle and road-border costs, adds the collision
-margin to the barrier activation distance. The viewer is passed only `obstacle_safe_margin` and
-`road_border_safe_margin`. Its red/green transition is therefore useful for inspecting the raw
-fields, but it does not mark the exact clearance at which the footprint-level rollout barriers
-activate.
+The obstacle, road-border and drivable-area textures hold point-to-segment/OBB distances. The
+rollout cost subsequently accounts for the ego circle radius and, for obstacle and road-border
+costs, adds the collision margin to the barrier activation distance. The RViz costmaps
+(`~/debug/mppi/{obstacle,road_border,drivable_area}_costmap`) copy those textures unchanged and
+apply the same footprint radius, margin and weight on the host, so the heat marks the clearance at
+which the footprint-level rollout barriers activate. The raw distances stay in the debug result.
 
 ## 15. Practical tuning notes
 
