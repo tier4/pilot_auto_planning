@@ -86,14 +86,41 @@ A weighted control sequence can be invalid even when contributing rollouts are v
 
 `skip_if_invalid: true` rejects an invalid optimized result and preserves input geometry, with the deterministic velocity-limit fallback when active. A cycle with no eligible rollouts always rejects, regardless of that option. The meaning of disabling final rejection and any future option to retain unsafe rollouts in weighting remain unresolved requirements; neither policy was changed. Returning the upstream input when MPPI fails is accepted behavior, not a guarantee that the fallback is safe.
 
-## Live distance-texture visualization
+## Costmap heatmaps in RViz
 
-Set `enable_distance_map_texture_debug: true` under `mppi_optimizer` to open the CUDA-OpenGL
-distance-map viewer. It displays road-border, drivable-boundary, and dynamic-obstacle ESDF panels.
-Drag the slider below the obstacle panel, or use the arrow/Home/End keys, to select its horizon
-timestep. Red is at or inside the boundary, green is at or beyond the configured safe margin, and
-gray means that texture channel is not valid yet. The viewer requires a graphical display; it is
-disabled by default and closing its window stops its updates.
+Set `enable_obstacle_costmap_debug: true` under `mppi_optimizer` to publish the obstacle cost field
+that the rollouts see as a `nav_msgs/OccupancyGrid` on `~/debug/mppi/obstacle_costmap`. In RViz add
+a **Map** display on that topic, set its **Color Scheme** to `costmap` (0 is transparent, then blue
+to red) and lower **Alpha** for a translucent overlay. The heatmap only exists on cycles where MPPI
+actually optimizes (`enabled: true`, and with `optimize_only_on_input_collision` only while a
+collision trigger is active); otherwise a single transparent cell is published.
+
+- **Frame.** The grid is a direct copy of the obstacle distance texture the rollouts sample
+  (512 x 512 at 0.30 m, about 153 m square), so no cost is recomputed. It is axis-aligned in the
+  odometry (map) frame and centered on the reference path, not on `base_link`; the origin comes
+  from the texture grid and is converted from the persistent local frame. The ego pose is in
+  `FirstOrderDubinsMppiCostmapSnapshot::ego_x/ego_y/ego_yaw`.
+- **Value.** The stored signed clearance is turned into
+  `100 * min(1, sqrt(cost / contact_cost))` on the host when publishing: the fraction of the
+  safety margin that an ego footprint circle centered on the cell would intrude into (0 at the edge
+  of influence, 100 at exact contact or inside an obstacle). The square root only makes the
+  quadratic barrier's outer halo visible.
+- **Time slice.** `obstacle_costmap_time_step` selects the texture slice (post-step index, 0 is
+  `dt` ahead; moving objects advance with it).
+- **Static layers.** Set `enable_static_costmap_debug: true` to also publish the road-border
+  (`~/debug/mppi/road_border_costmap`) and drivable-area (`~/debug/mppi/drivable_area_costmap`)
+  distance fields the same way (one 1024 x 1024 grid at 0.15 m, about 154 m square, copied in one
+  go and only when the static texture is rebuilt), each with its own **Map** display. Their heat
+  is the barrier intrusion normalized so that 100 means the ego footprint center is on the line,
+  because the drivable-area safe margin can be zero. The three grids sit 2 cm apart in height so
+  they never z-fight. Everything stays on the CUDA side; there is no OpenGL or display
+  requirement.
+- **Cost.** One slice (about 1 MB) is copied asynchronously into pinned host memory on the rollout
+  stream before `computeControl()`, whose own synchronization completes it, so no extra stream sync
+  is added. The copy is skipped while the texture is not rebuilt, and the heatmap conversion is
+  skipped while nobody subscribes. The raw clearance is returned in
+  `FirstOrderDubinsMppiDebug::obstacle_costmap` together with the optimized trajectory and the
+  rest of the result. Disabled (the default) it costs nothing.
 
 ## Offline debug logging + retune
 

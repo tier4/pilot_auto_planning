@@ -20,12 +20,15 @@
 #include "autoware/mppi_optimizer/first_order_dubins_mppi_vehicle_params.hpp"
 
 #include <autoware_perception_msgs/msg/predicted_objects.hpp>
+#include <builtin_interfaces/msg/time.hpp>
+
 #include <autoware_perception_msgs/msg/tracked_objects.hpp>
 #include <autoware_planning_msgs/msg/trajectory.hpp>
 #include <autoware_vehicle_msgs/msg/steering_report.hpp>
 #include <geometry_msgs/msg/accel_with_covariance_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -445,6 +448,72 @@ struct FirstOrderDubinsMppiRolloutDiagnostics
   std::string first_violation_object_id;
 };
 
+/**
+ * Distance field layer returned together with the rest of the optimization result: the obstacle
+ * field (one time slice), or the static road-border / drivable-area field.
+ *
+ * This is a copy of the very texture the rollouts sample; no cost is recomputed for it. The grid is
+ * axis-aligned in `frame_id` (it is centered on the reference path, not on base_link), so `ego_*`
+ * is provided to locate base_link inside it. Cell (col, row) has its center at (origin_x + (col +
+ * 0.5) * resolution_m, origin_y + (row + 0.5) * resolution_m); storage is row-major (`row * width +
+ * col`), the nav_msgs/OccupancyGrid layout.
+ *
+ * The rollout obstacle barrier of an ego footprint circle centered on a cell is derived from
+ * the stored clearance with `barrierCost()`.
+ */
+struct FirstOrderDubinsMppiCostmapSnapshot
+{
+  bool valid{false};
+  /** Frame of origin_x/origin_y and ego_x/ego_y/ego_yaw (the odometry frame). */
+  std::string frame_id;
+  builtin_interfaces::msg::Time stamp{};
+  /** base_link pose at planning time in frame_id. */
+  double ego_x{0.0};
+  double ego_y{0.0};
+  double ego_yaw{0.0};
+  int width{0};
+  int height{0};
+  float resolution_m{0.0F};
+  /** Corner of cell (0, 0) in frame_id. */
+  double origin_x{0.0};
+  double origin_y{0.0};
+  int time_step_index{0};
+  float time_offset_s{0.0F};
+  /** True when no obstacle was active; clearance is then the "empty" distance everywhere. */
+  bool empty{true};
+  float footprint_circle_radius_m{0.0F};
+  /** obstacle_collision_margin + obstacle_safe_margin: distance at which the barrier starts. */
+  float safety_margin_m{0.0F};
+  float barrier_weight{0.0F};
+  /**
+   * Barrier intrusion [m] that maps to full heat. 0 means "use safety_margin_m" (obstacle
+   * layer: footprint circle touching the obstacle). Static layers set it to margin + circle
+   * radius because their margin can be zero.
+   */
+  float full_scale_violation_m{0.0F};
+  /**
+   * Distance [m] from the cell center to the nearest obstacle box (<0 inside), or to the nearest
+   * road-border / drivable-area segment (unsigned) for the static layers.
+   */
+  std::vector<float> clearance_m;
+
+  /** The rollout obstacle barrier cost for an ego footprint circle centered at `clearance`. */
+  [[nodiscard]] float barrierCost(const float clearance) const
+  {
+    const float violation =
+      std::max(0.0F, safety_margin_m - (clearance - footprint_circle_radius_m));
+    return barrier_weight * violation * violation;
+  }
+
+  /** Barrier cost at exact contact; use it to normalize `barrierCost()`. Zero if disabled. */
+  [[nodiscard]] float referenceCost() const
+  {
+    const float full_scale =
+      full_scale_violation_m > 0.0F ? full_scale_violation_m : safety_margin_m;
+    return barrier_weight * full_scale * full_scale;
+  }
+};
+
 struct FirstOrderDubinsMppiDebug
 {
   Trajectory reference_trajectory;
@@ -511,6 +580,11 @@ struct FirstOrderDubinsMppiDebug
   bool previous_mppi_trajectory_applied{false};
   FirstOrderDubinsMppiMpcNominalSeedStatus mpc_nominal_seed_status{
     FirstOrderDubinsMppiMpcNominalSeedStatus::disabled};
+  /** Obstacle distance slice; only filled when the costmap debug option is enabled. */
+  FirstOrderDubinsMppiCostmapSnapshot obstacle_costmap;
+  /** Static map layers (same grid); only filled when enable_static_costmap_debug is set. */
+  FirstOrderDubinsMppiCostmapSnapshot road_border_costmap;
+  FirstOrderDubinsMppiCostmapSnapshot drivable_area_costmap;
 };
 
 struct FirstOrderDubinsMppiOptimizationResult
