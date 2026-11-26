@@ -74,7 +74,10 @@ if(ENABLE_ACADOS)
   ml_planner_add_acados_solver(ML_PLANNER_ACADOS_TARGET)
   if(ML_PLANNER_ACADOS_TARGET)
     set(ML_PLANNER_HAS_ACADOS TRUE)
-    list(APPEND ML_PLANNER_SOURCES src/optimization/trajectory_optimizer.cpp)
+    list(APPEND ML_PLANNER_SOURCES
+      src/optimization/trajectory_optimizer.cpp
+      src/optimization/lateral_acceleration_guard.cpp
+    )
   endif()
 endif()
 
@@ -158,7 +161,10 @@ if(BUILD_TESTING)
 
   # Keep the optimizer test conditional because its public API is only available with acados.
   if(ML_PLANNER_HAS_ACADOS)
-    list(APPEND ML_PLANNER_TEST_SOURCES test/trajectory_optimizer_test.cpp)
+    list(APPEND ML_PLANNER_TEST_SOURCES
+      test/trajectory_optimizer_test.cpp
+      test/lateral_acceleration_guard_test.cpp
+    )
   endif()
 
   ament_add_ros_isolated_gtest(test_ml_planner
