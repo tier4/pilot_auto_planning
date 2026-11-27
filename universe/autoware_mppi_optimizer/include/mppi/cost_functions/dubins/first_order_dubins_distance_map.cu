@@ -895,8 +895,9 @@ template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
 __host__ void FirstOrderDubinsBicycleCostImpl<
   CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::ensureStaticCostmapResources()
 {
+  // static_distance_array_ is float4 (road border .x, drivable area .y, ...).
   const std::size_t value_count =
-    2U * static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapWidth) *
+    4U * static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapWidth) *
     static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapHeight);
   if (static_costmap_host_.size() != value_count) {
     static_costmap_host_.resize(value_count);
@@ -936,7 +937,7 @@ __host__ bool FirstOrderDubinsBicycleCostImpl<
   cudaMemcpy3DParms copy{};
   copy.srcArray = this->texture_state_.static_distance_array_;
   copy.dstPtr = make_cudaPitchedPtr(
-    static_costmap_host_.data(), static_cast<std::size_t>(texture_grid.width) * sizeof(float2),
+    static_costmap_host_.data(), static_cast<std::size_t>(texture_grid.width) * sizeof(float4),
     static_cast<std::size_t>(texture_grid.width), static_cast<std::size_t>(texture_grid.height));
   copy.extent = make_cudaExtent(
     static_cast<std::size_t>(texture_grid.width), static_cast<std::size_t>(texture_grid.height), 1);
@@ -1004,8 +1005,9 @@ __host__ bool FirstOrderDubinsBicycleCostImpl<
     HANDLE_ERROR(cudaEventSynchronize(static_costmap_done_));
     const float * interleaved = static_costmap_host_.data();
     for (std::size_t cell = 0; cell < cell_count; ++cell) {
-      if (!road_border.empty) road_border.clearance_m[cell] = interleaved[2U * cell];
-      if (!drivable_area.empty) drivable_area.clearance_m[cell] = interleaved[2U * cell + 1U];
+      const std::size_t base = 4U * cell;
+      if (!road_border.empty) road_border.clearance_m[cell] = interleaved[base];
+      if (!drivable_area.empty) drivable_area.clearance_m[cell] = interleaved[base + 1U];
     }
   }
   road_border.valid = true;
