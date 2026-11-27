@@ -44,6 +44,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -51,6 +52,23 @@ namespace autoware::mppi_optimizer::plugin
 {
 namespace
 {
+
+/// ExtendedRouteCache takes a std::shared_ptr. With ENABLE_AGNOCAST=1 the map arrives as an
+/// agnocast_wrapper::message_ptr, so keep a copy of it alive inside an aliasing std::shared_ptr.
+template <typename PtrT>
+autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr to_std_shared_ptr(const PtrT & ptr)
+{
+  using StdPtr = autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr;
+  if constexpr (std::is_convertible_v<PtrT, StdPtr>) {
+    return ptr;
+  } else {
+    if (!ptr) {
+      return nullptr;
+    }
+    auto holder = std::make_shared<const PtrT>(ptr);
+    return StdPtr{holder, holder->get()};
+  }
+}
 
 using autoware::trajectory_modifier::plugin::ProcessingResult;
 using autoware_planning_msgs::msg::Trajectory;
@@ -575,7 +593,7 @@ ProcessingResult TrajectoryMppiOptimizer::process(
     input.points = trajectory_points;
     if (!detail::hasMppiTimeStep(input)) {
       RCLCPP_WARN_THROTTLE(
-        get_node_ptr()->get_logger(), *get_node_ptr()->get_clock(), 5000,
+        get_logger(), *get_clock(), 5000,
         "MPPI requires input trajectory timestamps spaced by 0.1 s; input times are preserved");
     }
 
@@ -595,7 +613,7 @@ ProcessingResult TrajectoryMppiOptimizer::process(
         !has_point_field(cloud, "y", float32, 4U) || !has_point_field(cloud, "z", float32, 4U) ||
         !has_point_field(cloud, "class_id", uint8, 1U)) {
         RCLCPP_WARN_THROTTLE(
-          get_node_ptr()->get_logger(), *get_node_ptr()->get_clock(), 5000,
+          get_logger(), *get_clock(), 5000,
           "MPPI vegetation pointcloud has an unsupported layout or missing class_id field");
       } else {
         try {
@@ -613,14 +631,14 @@ ProcessingResult TrajectoryMppiOptimizer::process(
             vegetation_filter_margin_m_);
         } catch (const std::exception & error) {
           RCLCPP_WARN_THROTTLE(
-            get_node_ptr()->get_logger(), *get_node_ptr()->get_clock(), 5000,
+            get_logger(), *get_clock(), 5000,
             "MPPI vegetation pointcloud unavailable: %s", error.what());
         }
       }
     }
 
     object_selector_.update_objects(
-      get_node_ptr()->now(), *data.tracked_objects, input, *extended_route_handler_);
+      now(), *data.tracked_objects, input, *extended_route_handler_);
     // A zero-extent reference cannot form selector geometry, but still needs the interface's
     // measured/latched steering hold. Do not enter the collision gate or GPU optimizer.
     using autoware::avoidance_target_detector::SelectionStatus;
@@ -936,7 +954,7 @@ void TrajectoryMppiOptimizer::update_route_context(
   const autoware::trajectory_modifier::TrajectoryModifierData & data)
 {
   auto next_handler = context_->extended_route_cache.get_or_create(
-    data.lanelet_map, data.lanelet_map_bin, *data.route, true);
+    data.lanelet_map, to_std_shared_ptr(data.lanelet_map_bin), *data.route, true);
   if (next_handler == extended_route_handler_) {
     return;
   }
