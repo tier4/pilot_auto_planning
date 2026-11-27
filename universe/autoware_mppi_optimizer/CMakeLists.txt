@@ -260,6 +260,35 @@ if(CUDA_AVAIL)
     src/first_order_dubins/input_collision_gate.cu
   )
   find_package(autoware_trajectory_modifier REQUIRED)
+<<<<<<< Updated upstream
+=======
+  # Only the acados MPT solver libs — not ${autoware_trajectory_modifier_LIBRARIES}, which
+  # also merges every exported find_package() dependency (thousands of libs) and plugin
+  # DSOs that must not participate in executable links.
+  find_library(_mppi_lib_acados_interface_temporal NAMES acados_interface_temporal
+    PATHS "${autoware_trajectory_modifier_DIR}/../../../lib" NO_DEFAULT_PATH REQUIRED)
+  find_library(_mppi_lib_acados_interface_time_seq NAMES acados_interface_time_seq
+    PATHS "${autoware_trajectory_modifier_DIR}/../../../lib" NO_DEFAULT_PATH REQUIRED)
+  set(_mppi_trajectory_modifier_acados_libs
+    ${_mppi_lib_acados_interface_temporal}
+    ${_mppi_lib_acados_interface_time_seq})
+  ament_auto_add_library(mppi_temporal_mpt_nominal SHARED
+    src/first_order_dubins/temporal_mpt_nominal.cpp
+  )
+  if(autoware_trajectory_modifier_LINK_FLAGS)
+    target_link_libraries(mppi_temporal_mpt_nominal ${autoware_trajectory_modifier_LINK_FLAGS})
+  endif()
+  target_link_libraries(mppi_temporal_mpt_nominal
+    mppi_trajectory_utils
+    ${_mppi_trajectory_modifier_acados_libs}
+    rclcpp::rclcpp
+    tf2::tf2
+    tf2_geometry_msgs::tf2_geometry_msgs
+    autoware_planning_msgs::autoware_planning_msgs__rosidl_generator_cpp
+  )
+  # Entry point for acados here: ${_mppi_trajectory_modifier_acados_libs} above.
+  mppi_link_acados_runtime(mppi_temporal_mpt_nominal)
+>>>>>>> Stashed changes
   target_include_directories(first_order_dubins_mppi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
