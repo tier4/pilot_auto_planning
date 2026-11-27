@@ -39,6 +39,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -46,6 +47,23 @@ namespace autoware::mppi_optimizer::plugin
 {
 namespace
 {
+
+/// ExtendedRouteCache takes a std::shared_ptr. With ENABLE_AGNOCAST=1 the map arrives as an
+/// agnocast_wrapper::message_ptr, so keep a copy of it alive inside an aliasing std::shared_ptr.
+template <typename PtrT>
+autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr to_std_shared_ptr(const PtrT & ptr)
+{
+  using StdPtr = autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr;
+  if constexpr (std::is_convertible_v<PtrT, StdPtr>) {
+    return ptr;
+  } else {
+    if (!ptr) {
+      return nullptr;
+    }
+    auto holder = std::make_shared<const PtrT>(ptr);
+    return StdPtr{holder, holder->get()};
+  }
+}
 
 using autoware::trajectory_modifier::plugin::ProcessingResult;
 using autoware_utils_geometry::Segment2d;
@@ -828,21 +846,14 @@ ProcessingResult TrajectoryMppiOptimizer::skip_optimization(
 void TrajectoryMppiOptimizer::update_route_context(
   const autoware::trajectory_modifier::TrajectoryModifierData & data)
 {
-  const bool route_changed = !current_route_uuid_ ||
-                             current_route_uuid_.value() != data.route->uuid ||
-                             current_route_segments_ != data.route->segments;
-  // Compare the underlying pointers: message_ptr has no operator!=, unlike shared_ptr.
-  const bool map_changed = current_map_.get() != data.lanelet_map_bin.get();
-  if (!route_changed && !map_changed && extended_route_handler_) {
+  auto next_handler = context_->extended_route_cache.get_or_create(
+    data.lanelet_map, to_std_shared_ptr(data.lanelet_map_bin), *data.route, true);
+  if (next_handler == extended_route_handler_) {
     return;
   }
 
-  extended_route_handler_ =
-    std::make_shared<autoware::avoidance_target_detector::ExtendedRouteHandler>(
-      *data.lanelet_map_bin, *data.route);
-  extended_route_handler_->create_map();
   std::vector<PreferredLaneCenterlineSelector::Section> sections;
-  const auto map = extended_route_handler_->getOriginalRouteHandler()->getLaneletMapPtr();
+  const auto & map = next_handler->getOriginalMap();
   for (const auto & route_section : data.route->segments) {
     PreferredLaneCenterlineSelector::Section section;
     for (const auto & primitive : route_section.primitives) {
@@ -859,9 +870,7 @@ void TrajectoryMppiOptimizer::update_route_context(
     sections.push_back(std::move(section));
   }
   preferred_lane_selector_.reset(std::move(sections));
-  current_route_uuid_ = data.route->uuid;
-  current_route_segments_ = data.route->segments;
-  current_map_ = data.lanelet_map_bin;
+  extended_route_handler_ = std::move(next_handler);
   reset_optimizer();
 }
 
