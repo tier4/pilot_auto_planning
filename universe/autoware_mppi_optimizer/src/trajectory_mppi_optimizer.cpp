@@ -39,6 +39,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -46,6 +47,23 @@ namespace autoware::mppi_optimizer::plugin
 {
 namespace
 {
+
+/// ExtendedRouteCache takes a std::shared_ptr. With ENABLE_AGNOCAST=1 the map arrives as an
+/// agnocast_wrapper::message_ptr, so keep a copy of it alive inside an aliasing std::shared_ptr.
+template <typename PtrT>
+autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr to_std_shared_ptr(const PtrT & ptr)
+{
+  using StdPtr = autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr;
+  if constexpr (std::is_convertible_v<PtrT, StdPtr>) {
+    return ptr;
+  } else {
+    if (!ptr) {
+      return nullptr;
+    }
+    auto holder = std::make_shared<const PtrT>(ptr);
+    return StdPtr{holder, holder->get()};
+  }
+}
 
 using autoware::trajectory_modifier::plugin::ProcessingResult;
 using autoware_utils_geometry::Segment2d;
@@ -829,7 +847,7 @@ void TrajectoryMppiOptimizer::update_route_context(
   const autoware::trajectory_modifier::TrajectoryModifierData & data)
 {
   auto next_handler = context_->extended_route_cache.get_or_create(
-    data.lanelet_map, data.lanelet_map_bin, *data.route, true);
+    data.lanelet_map, to_std_shared_ptr(data.lanelet_map_bin), *data.route, true);
   if (next_handler == extended_route_handler_) {
     return;
   }
