@@ -288,6 +288,12 @@ std::optional<std::vector<double>> optimize_goal_shift(
       upper[static_cast<std::size_t>(row)] = max_curvature_rate * ds - constant;
     }
 
+    for (std::size_t row = 0; row < lower.size(); ++row) {
+      if (!(lower[row] <= upper[row])) {
+        return std::nullopt;
+      }
+    }
+
     // Started from the previous pass, not cold: the passes differ by the linearization only, and
     // from zero each takes thousands of iterations at a corner beyond the steering at speed
     solver.initializeProblem(p_matrix, a_matrix, q_vector, lower, upper);
