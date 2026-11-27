@@ -86,4 +86,16 @@ TEST(OptimizeGoalShift, ReportsAnInfeasibleBound)
   EXPECT_FALSE(optimize_goal_shift(nominal, straight, ds, 0.05, lo, hi).has_value());
 }
 
+TEST(OptimizeGoalShift, ReportsCrossedBoundsWithoutSolving)
+{
+  const auto nominal = quintic_ramp(10, 3.0);
+  const std::vector<double> straight(nominal.size(), 0.0);
+  // A corridor narrower than the footprint and the clearance: OSQP refuses the setup
+  std::vector<double> lo(nominal.size(), -10.0);
+  std::vector<double> hi(nominal.size(), 10.0);
+  lo[5] = 0.9;
+  hi[5] = 0.8;
+  EXPECT_FALSE(optimize_goal_shift(nominal, straight, 1.0, 0.13, lo, hi).has_value());
+}
+
 }  // namespace autoware::safety_planner
