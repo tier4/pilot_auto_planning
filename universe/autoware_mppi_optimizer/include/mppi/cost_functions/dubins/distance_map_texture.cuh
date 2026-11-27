@@ -56,6 +56,7 @@ struct alignas(16) DistanceMapTextureState
   bool obstacle_texture_valid_ = false;
   bool obstacle_texture_has_obstacles_ = false;
   bool nearest_segment_texture_valid_ = false;
+  bool static_distance_visualization_dirty_ = true;
   friend struct DistanceMapTextureTestAccess;
 
   static constexpr int kStaticDistanceMapWidth = 1024;

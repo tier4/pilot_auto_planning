@@ -229,6 +229,44 @@ __host__ __device__ __noinline__ float distanceToClosestObstacleAnalyticalFallba
   return min_distance;
 }
 
+template <int NUM_TIMESTEPS, class PARAMS_T>
+__host__ __device__ __noinline__ float softViolationToClosestObstacleAnalytical(
+  const float circle_x[kEgoSpineCircleCount], const float circle_y[kEgoSpineCircleCount],
+  const float circle_radius, const int t, const FirstOrderDubinsRuntimeData<NUM_TIMESTEPS> & data,
+  const PARAMS_T & params)
+{
+  const auto margins = params.obstacleMarginProfile();
+  const float collision_lon = margins.collision_lon + circle_radius;
+  const float collision_lat = margins.collision_lat + circle_radius;
+  float max_violation = 0.0F;
+  const int num_obstacles = mppi::memory::loadReadOnly(&data.num_obstacles_);
+  for (int i = 0; i < num_obstacles; ++i) {
+    if (!data.obstacleActiveAtStep(i, t)) continue;
+    float obs_cos;
+    float obs_sin;
+    const float obs_yaw = mppi::memory::loadReadOnly(&data.obs_yaw_[i][t]);
+#ifdef __CUDA_ARCH__
+    __sincosf(obs_yaw, &obs_sin, &obs_cos);
+#else
+    obs_cos = std::cos(obs_yaw);
+    obs_sin = std::sin(obs_yaw);
+#endif
+    const float obs_x = mppi::memory::loadReadOnly(&data.obs_x_[i][t]);
+    const float obs_y = mppi::memory::loadReadOnly(&data.obs_y_[i][t]);
+    const float obs_half_length = mppi::memory::loadReadOnly(&data.obs_half_length_[i]);
+    const float obs_half_width = mppi::memory::loadReadOnly(&data.obs_half_width_[i]);
+#pragma unroll
+    for (int circle = 0; circle < kEgoSpineCircleCount; ++circle) {
+      max_violation = fmaxf(
+        max_violation, mppi::cost::detail::anisotropicSoftViolation(
+                         circle_x[circle], circle_y[circle], obs_x, obs_y, obs_cos, obs_sin,
+                         obs_half_length, obs_half_width, collision_lon, collision_lat,
+                         margins.safe_lon, margins.safe_lat));
+    }
+  }
+  return max_violation;
+}
+
 template <int NUM_TIMESTEPS>
 __host__ __device__ __noinline__ float cornerBufferCostAnalyticalFallback(
   const float corners_x[4], const float corners_y[4], const float margin,
@@ -656,16 +694,8 @@ void FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAM
       ++timesteps;
     }
   }
-  const float last_step = horizon_s > 0.0F
-                            ? std::min(horizon_s / dt - 1.0F, static_cast<float>(NUM_TIMESTEPS - 1))
-                            : static_cast<float>(NUM_TIMESTEPS - 1);
-  if (
-    runtimeData().dynamic_obstacle_timesteps_ == timesteps &&
-    runtimeData().dynamic_obstacle_last_step_ == last_step) {
-    return;
-  }
+  if (runtimeData().dynamic_obstacle_timesteps_ == timesteps) return;
   runtimeData().dynamic_obstacle_timesteps_ = timesteps;
-  runtimeData().dynamic_obstacle_last_step_ = last_step;
   dataToDevice();
   // The cutoff changes map contents even when obstacle poses have not changed.
   refreshDistanceMapTextures(true, false, false);
@@ -1086,9 +1116,11 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
 #endif
   const float ego_cx = x + this->params_.ego_axle_to_box_center * ego_cos;
   const float ego_cy = y + this->params_.ego_axle_to_box_center * ego_sin;
-  const float margin = this->params_.obstacle_collision_margin;
-  const float ego_hl = this->params_.ego_length * 0.5F + margin;
-  const float ego_hw = this->params_.ego_width * 0.5F + margin;
+  // Collision zone: ego inflated by the smaller collision margin, obstacle grown along its own
+  // axes by the remainder. Stored extents are the true obstacle size.
+  const auto margins = this->params_.obstacleMarginProfile();
+  const float ego_hl = this->params_.ego_length * 0.5F + margins.collision_ego_margin;
+  const float ego_hw = this->params_.ego_width * 0.5F + margins.collision_ego_margin;
   const auto & data = runtimeData();
   const int num_obstacles = mppi::memory::loadReadOnly(&data.num_obstacles_);
 
@@ -1109,40 +1141,9 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
           ego_cx, ego_cy, ego_cos, ego_sin, ego_hl, ego_hw,
           mppi::memory::loadReadOnly(&data.obs_x_[i][t]),
           mppi::memory::loadReadOnly(&data.obs_y_[i][t]), obs_cos, obs_sin,
-          mppi::memory::loadReadOnly(&data.obs_half_length_[i]),
-          mppi::memory::loadReadOnly(&data.obs_half_width_[i]))) {
+          mppi::memory::loadReadOnly(&data.obs_half_length_[i]) + margins.collision_extra_length,
+          mppi::memory::loadReadOnly(&data.obs_half_width_[i]) + margins.collision_extra_width)) {
       if (intersecting_obstacle != nullptr) *intersecting_obstacle = i;
-      return true;
-    }
-  }
-  return false;
-}
-
-template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
-__host__ bool FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
-  egoIntersectsObstacleAtFractionalStep(
-    const float x, const float y, const float yaw, const float timestep) const
-{
-  const float t = std::clamp(timestep, 0.0F, static_cast<float>(NUM_TIMESTEPS - 1));
-  const int lo = static_cast<int>(t);
-  const int hi = std::min(lo + 1, NUM_TIMESTEPS - 1);
-  const float fraction = t - lo;
-  const float ego_cos = std::cos(yaw), ego_sin = std::sin(yaw);
-  const float cx = x + this->params_.ego_axle_to_box_center * ego_cos;
-  const float cy = y + this->params_.ego_axle_to_box_center * ego_sin;
-  const float margin = this->params_.obstacle_collision_margin;
-  const auto & data = runtimeData();
-  for (int i = 0; i < data.num_obstacles_; ++i) {
-    if (!data.obs_is_static_[i] && t > data.dynamic_obstacle_last_step_ + 1.0E-5F) continue;
-    const float ox = data.obs_x_[i][lo] + fraction * (data.obs_x_[i][hi] - data.obs_x_[i][lo]);
-    const float oy = data.obs_y_[i][lo] + fraction * (data.obs_y_[i][hi] - data.obs_y_[i][lo]);
-    const float angle =
-      data.obs_yaw_[i][lo] +
-      fraction * angle_utils::shortestAngularDistance(data.obs_yaw_[i][lo], data.obs_yaw_[i][hi]);
-    if (orientedBoxesOverlap(
-          cx, cy, ego_cos, ego_sin, this->params_.ego_length * 0.5F + margin,
-          this->params_.ego_width * 0.5F + margin, ox, oy, std::cos(angle), std::sin(angle),
-          data.obs_half_length_[i], data.obs_half_width_[i])) {
       return true;
     }
   }
@@ -1215,6 +1216,45 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
 #endif
   return distanceToClosestObstacleAnalyticalFallback(
     circle_x, circle_y, circle_radius, t, runtimeData(), closest_obstacle);
+}
+
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ bool FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
+  egoIntersectsObstacleAtFractionalStep(
+    const float x, const float y, const float yaw, const float timestep) const
+{
+  const float t = std::clamp(timestep, 0.0F, static_cast<float>(NUM_TIMESTEPS - 1));
+  const int lo = static_cast<int>(t);
+  const int hi = std::min(lo + 1, NUM_TIMESTEPS - 1);
+  const float fraction = t - static_cast<float>(lo);
+  const float ego_cos = std::cos(yaw);
+  const float ego_sin = std::sin(yaw);
+  const float ego_cx = x + this->params_.ego_axle_to_box_center * ego_cos;
+  const float ego_cy = y + this->params_.ego_axle_to_box_center * ego_sin;
+  const auto margins = this->params_.obstacleMarginProfile();
+  const float ego_hl = this->params_.ego_length * 0.5F + margins.collision_ego_margin;
+  const float ego_hw = this->params_.ego_width * 0.5F + margins.collision_ego_margin;
+  const auto & data = runtimeData();
+  for (int i = 0; i < data.num_obstacles_; ++i) {
+    if (!data.obs_is_static_[i] && t > data.dynamic_obstacle_last_step_ + 1.0E-5F) {
+      continue;
+    }
+    const float ox = data.obs_x_[i][lo] + fraction * (data.obs_x_[i][hi] - data.obs_x_[i][lo]);
+    const float oy = data.obs_y_[i][lo] + fraction * (data.obs_y_[i][hi] - data.obs_y_[i][lo]);
+    const float angle =
+      data.obs_yaw_[i][lo] +
+      fraction * angle_utils::shortestAngularDistance(data.obs_yaw_[i][lo], data.obs_yaw_[i][hi]);
+    const float obs_cos = std::cos(angle);
+    const float obs_sin = std::sin(angle);
+    if (orientedBoxesOverlap(
+          ego_cx, ego_cy, ego_cos, ego_sin, ego_hl, ego_hw, ox, oy, obs_cos, obs_sin,
+          data.obs_half_length_[i] + margins.collision_extra_length,
+          data.obs_half_width_[i] + margins.collision_extra_width)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
@@ -1341,6 +1381,34 @@ __host__ __device__ bool FirstOrderDubinsBicycleCostImpl<
 template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
 __host__ __device__ float
 FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
+  softViolationToClosestObstacle(const float x, const float y, const float yaw, const int timestep)
+    const
+{
+  const int t = clampTimestep(timestep, NUM_TIMESTEPS);
+#ifdef __CUDA_ARCH__
+  const float ego_cos = cosf(yaw);
+  const float ego_sin = sinf(yaw);
+#else
+  const float ego_cos = std::cos(yaw);
+  const float ego_sin = std::sin(yaw);
+#endif
+  const float ego_cx = x + this->params_.ego_axle_to_box_center * ego_cos;
+  const float ego_cy = y + this->params_.ego_axle_to_box_center * ego_sin;
+  const float ego_half_length = this->params_.ego_length * 0.5F;
+  const float ego_half_width = this->params_.ego_width * 0.5F;
+  float circle_x[kEgoSpineCircleCount];
+  float circle_y[kEgoSpineCircleCount];
+  float circle_radius = 0.0F;
+  computeEgoSpineCircles(
+    ego_cx, ego_cy, ego_cos, ego_sin, ego_half_length, ego_half_width, circle_x, circle_y,
+    circle_radius);
+  return softViolationToClosestObstacleAnalytical(
+    circle_x, circle_y, circle_radius, t, runtimeData(), this->params_);
+}
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ __device__ float
+FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
   computeTrackCenterValue(float x, float y, float yaw, int timestep, const float * theta_c) const
 {
   const auto buf = resolvePathBuffers(*this, theta_c);
@@ -1416,7 +1484,7 @@ __host__ __device__ float FirstOrderDubinsBicycleCostImpl<
         const float texture_y =
           (corners_y[corner] - texture_state_.static_distance_map_grid_.origin_y) /
           texture_state_.static_distance_map_grid_.resolution;
-        const float distance = tex2D<float4>(static_distance_texture, texture_x, texture_y).y;
+        const float distance = tex2D<float2>(static_distance_texture, texture_x, texture_y).y;
         const float violation = fmaxf(0.0F, margin - distance);
         total_cost += violation * violation;
       }
@@ -1492,7 +1560,7 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
 #pragma unroll
       for (int circle = 0; circle < kEgoSpineCircleCount; ++circle) {
         minimum = fminf(
-          minimum, tex2D<float4>(static_distance_texture, texture_x[circle], texture_y[circle]).x -
+          minimum, tex2D<float2>(static_distance_texture, texture_x[circle], texture_y[circle]).x -
                      circle_radius);
       }
       return fmaxf(minimum, 0.0F);
@@ -1548,7 +1616,7 @@ __host__ __device__ float FirstOrderDubinsBicycleCostImpl<
 #pragma unroll
       for (int circle = 0; circle < kEgoSpineCircleCount; ++circle) {
         minimum = fminf(
-          minimum, tex2D<float4>(static_distance_texture, texture_x[circle], texture_y[circle]).y -
+          minimum, tex2D<float2>(static_distance_texture, texture_x[circle], texture_y[circle]).y -
                      circle_radius);
       }
       return minimum;
@@ -1577,24 +1645,26 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
           distanceToDrivableArea(x, y, yaw), this->params_.drivable_area_safe_margin,
           this->params_.drivable_area_barrier_weight);
   obstacle_cost = 0.0F;
-  if (
-    this->params_.obstacle_barrier_weight != 0.0F || safety_violation != nullptr ||
-    rollout_status != nullptr) {
+  if (this->params_.obstacle_barrier_weight != 0.0F) {
+    // Soft violation is anisotropic in the obstacle frame: 1 at the collision boundary, 0 at each
+    // axis's safe margin. Weight is crash_contact_penalty so cost = penalty * violation^2.
+    const auto margins = this->params_.obstacleMarginProfile();
+    const float soft_violation = softViolationToClosestObstacle(x, y, yaw, timestep);
+    obstacle_cost =
+      this->params_.obstacle_barrier_weight * soft_violation * soft_violation;
     const float obstacle_distance = distanceToClosestObstacle(x, y, yaw, timestep);
-    obstacle_cost = computeSmoothBarrierCost(
-      obstacle_distance,
-      this->params_.obstacle_collision_margin + this->params_.obstacle_safe_margin,
-      this->params_.obstacle_barrier_weight);
     float resolution = 0.0F;
 #ifdef __CUDA_ARCH__
     if (texture_state_.obstacle_texture_valid_) {
       resolution = texture_state_.obstacle_distance_map_grid_.resolution;
     }
 #endif
+    const float collision_reach =
+      fmaxf(margins.collision_lon, margins.collision_lat);
     if (
       (safety_violation != nullptr || rollout_status != nullptr) &&
       distanceFieldMayIntersectInflatedRectangle(
-        obstacle_distance, this->params_.obstacle_collision_margin, resolution, x, y)) {
+        obstacle_distance, collision_reach, resolution, x, y)) {
       int intersecting_obstacle = -1;
       const bool collision =
         egoIntersectsObstacleAtStep(x, y, yaw, timestep, &intersecting_obstacle);
@@ -1602,21 +1672,8 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
       markSafetyViolation(rollout_status, collision, 2, timestep, intersecting_obstacle);
     }
   }
-  if (this->params_.vegetation_barrier_weight != 0.0F) {
-    obstacle_cost += computeSmoothBarrierCost(
-      distanceToClosestVegetation(x, y, yaw),
-      this->params_.vegetation_collision_margin + this->params_.vegetation_safe_margin,
-      this->params_.vegetation_barrier_weight);
-  }
-  if (safety_violation != nullptr || rollout_status != nullptr) {
-    const bool collision = egoIntersectsVegetation(x, y, yaw);
-    if (safety_violation != nullptr) *safety_violation = *safety_violation || collision;
-    markSafetyViolation(rollout_status, collision, 2, timestep, -1);
-  }
   road_border_cost = 0.0F;
-  if (
-    this->params_.road_border_barrier_weight != 0.0F || safety_violation != nullptr ||
-    rollout_status != nullptr) {
+  if (this->params_.road_border_barrier_weight != 0.0F) {
     const float road_border_distance = distanceToRoadBorder(x, y, yaw);
     road_border_cost = computeSmoothBarrierCost(
       road_border_distance,
@@ -1657,7 +1714,7 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
 
   result.track = this->params_.track_coeff * computeTrackValue(x_pos, y_pos, timestep);
   result.heading = this->params_.heading_coeff * computeHeadingValue(yaw, timestep);
-  if (crash_status != nullptr || needsLateralPathMetrics(this->params_)) {
+  if (needsLateralPathMetrics(this->params_)) {
     const LateralPathMetrics lateral = computeLateralPathMetrics(x_pos, y_pos, yaw);
     if (
       this->params_.spatial_overspeed_coeff > 0.0F &&
@@ -1673,8 +1730,9 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
     result.lateral_distance =
       this->params_.lateral_distance_coeff * lateral.lateral_distance * lateral.lateral_distance;
     result.lateral_boundary = lateralBoundaryBarrierCost(this->params_, lateral.lateral_distance);
-    safety_violation =
-      absLateralDistance(lateral.lateral_distance) >= this->params_.boundary_threshold;
+    safety_violation = safety_violation || (this->params_.lateral_boundary_barrier_weight > 0.0F &&
+                                            absLateralDistance(lateral.lateral_distance) >=
+                                              this->params_.boundary_threshold);
     result.lateral_yaw_error = this->params_.lateral_yaw_error_coeff * lateral.lateral_yaw_error_sq;
     result.remaining_distance = this->params_.remaining_distance_coeff *
                                 lateral.remaining_distance_s * lateral.remaining_distance_s;
@@ -1793,7 +1851,7 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
   float remaining_distance_cost = 0.0F;
   float path_overshoot_cost = 0.0F;
   bool safety_violation = false;
-  if (crash_status != nullptr || needsLateralPathMetrics(this->params_)) {
+  if (needsLateralPathMetrics(this->params_)) {
     const LateralPathMetrics lateral = computeLateralPathMetrics(x_pos, y_pos, yaw, theta_c);
     const float corridor_length =
       mppi::memory::loadReadOnly(&runtimeData().lateral_corridor_total_length_s_);
@@ -1809,6 +1867,7 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
       this->params_.lateral_distance_coeff * lateral.lateral_distance * lateral.lateral_distance;
     lateral_boundary_cost = lateralBoundaryBarrierCost(this->params_, lateral.lateral_distance);
     safety_violation =
+      this->params_.lateral_boundary_barrier_weight > 0.0F &&
       absLateralDistance(lateral.lateral_distance) >= this->params_.boundary_threshold;
     lateral_yaw_error_cost = this->params_.lateral_yaw_error_coeff * lateral.lateral_yaw_error_sq;
     remaining_distance_cost = this->params_.remaining_distance_coeff *
@@ -1852,7 +1911,7 @@ float FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARA
   float remaining_distance_cost = 0.0F;
   float path_overshoot_cost = 0.0F;
   bool safety_violation = false;
-  if (crash_status != nullptr || needsLateralPathMetrics(this->params_)) {
+  if (needsLateralPathMetrics(this->params_)) {
     const LateralPathMetrics lateral = computeLateralPathMetrics(x_pos, y_pos, yaw);
     if (
       this->params_.spatial_overspeed_coeff > 0.0F &&
@@ -1869,6 +1928,7 @@ float FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARA
       this->params_.lateral_distance_coeff * lateral.lateral_distance * lateral.lateral_distance;
     lateral_boundary_cost = lateralBoundaryBarrierCost(this->params_, lateral.lateral_distance);
     safety_violation =
+      this->params_.lateral_boundary_barrier_weight > 0.0F &&
       absLateralDistance(lateral.lateral_distance) >= this->params_.boundary_threshold;
     lateral_yaw_error_cost = this->params_.lateral_yaw_error_coeff * lateral.lateral_yaw_error_sq;
     remaining_distance_cost = this->params_.remaining_distance_coeff *

@@ -837,28 +837,55 @@ __host__ bool FirstOrderDubinsBicycleCostImpl<
   out.time_step_index = obstacle_costmap_time_step_;
   out.empty = obstacle_costmap_empty_;
 
-  // Same footprint model as distanceToClosestObstacle(): the circle union's radius is removed
-  // from the field, then the barrier is applied to the remaining clearance.
+  // Costmap cells show anisotropic soft violation for an ego footprint circle centered on the
+  // cell: heat = 100 at the collision boundary, 0 at each axis's safe margin. Store (1 - v) as
+  // "clearance" with unit safety margin so costmapHeat maps it linearly. Circle radius is already
+  // folded into the collision margins below — leave footprint_circle_radius_m at 0 so barrierCost
+  // does not subtract it again (that made every cell full heat).
   float circle_x[kEgoSpineCircleCount];
   float circle_y[kEgoSpineCircleCount];
   float circle_radius = 0.0F;
   computeEgoSpineCircles(
     0.0F, 0.0F, 1.0F, 0.0F, this->params_.ego_length * 0.5F, this->params_.ego_width * 0.5F,
     circle_x, circle_y, circle_radius);
-  out.footprint_circle_radius_m = circle_radius;
-  out.safety_margin_m = this->params_.obstacle_collision_margin + this->params_.obstacle_safe_margin;
-  out.barrier_weight = this->params_.obstacle_barrier_weight;
+  out.footprint_circle_radius_m = 0.0F;
+  out.safety_margin_m = 1.0F;
+  out.full_scale_violation_m = 1.0F;
+  out.barrier_weight = 1.0F;
 
   const std::size_t cell_count =
     static_cast<std::size_t>(std::max(grid.width, 0)) *
     static_cast<std::size_t>(std::max(grid.height, 0));
-  if (out.empty) {
-    out.clearance_m.assign(cell_count, kDistanceMapEmptyDistance);
-  } else {
-    // Wait for the copy (normally already complete). A cached copy has nothing new to wait for.
-    HANDLE_ERROR(cudaEventSynchronize(obstacle_costmap_done_));
-    const float * clearance = obstacle_costmap_host_.data();
-    out.clearance_m.assign(clearance, clearance + cell_count);
+  out.clearance_m.assign(cell_count, 1.0F);
+  if (!out.empty && grid.width > 0 && grid.height > 0) {
+    const auto margins = this->params_.obstacleMarginProfile();
+    const float collision_lon = margins.collision_lon + circle_radius;
+    const float collision_lat = margins.collision_lat + circle_radius;
+    const auto & data = runtimeData();
+    const int t = std::clamp(
+      obstacle_costmap_time_step_, 0, std::max(NUM_TIMESTEPS, 1) - 1);
+    for (int row = 0; row < grid.height; ++row) {
+      for (int col = 0; col < grid.width; ++col) {
+        const float wx =
+          static_cast<float>(grid.origin_x) + (static_cast<float>(col) + 0.5F) * grid.resolution;
+        const float wy =
+          static_cast<float>(grid.origin_y) + (static_cast<float>(row) + 0.5F) * grid.resolution;
+        float violation = 0.0F;
+        for (int i = 0; i < data.num_obstacles_; ++i) {
+          if (!data.obstacleActiveAtStep(i, t)) continue;
+          const float obs_yaw = data.obs_yaw_[i][t];
+          const float obs_cos = std::cos(obs_yaw);
+          const float obs_sin = std::sin(obs_yaw);
+          violation = std::max(
+            violation, mppi::cost::detail::anisotropicSoftViolation(
+                         wx, wy, data.obs_x_[i][t], data.obs_y_[i][t], obs_cos, obs_sin,
+                         data.obs_half_length_[i], data.obs_half_width_[i], collision_lon,
+                         collision_lat, margins.safe_lon, margins.safe_lat));
+        }
+        out.clearance_m[static_cast<std::size_t>(row) * static_cast<std::size_t>(grid.width) +
+                        static_cast<std::size_t>(col)] = 1.0F - violation;
+      }
+    }
   }
   out.valid = true;
   return true;
@@ -868,8 +895,9 @@ template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
 __host__ void FirstOrderDubinsBicycleCostImpl<
   CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::ensureStaticCostmapResources()
 {
+  // static_distance_array_ is float4 (road border .x, drivable area .y, ...).
   const std::size_t value_count =
-    2U * static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapWidth) *
+    4U * static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapWidth) *
     static_cast<std::size_t>(this->texture_state_.kStaticDistanceMapHeight);
   if (static_costmap_host_.size() != value_count) {
     static_costmap_host_.resize(value_count);
@@ -909,7 +937,7 @@ __host__ bool FirstOrderDubinsBicycleCostImpl<
   cudaMemcpy3DParms copy{};
   copy.srcArray = this->texture_state_.static_distance_array_;
   copy.dstPtr = make_cudaPitchedPtr(
-    static_costmap_host_.data(), static_cast<std::size_t>(texture_grid.width) * sizeof(float2),
+    static_costmap_host_.data(), static_cast<std::size_t>(texture_grid.width) * sizeof(float4),
     static_cast<std::size_t>(texture_grid.width), static_cast<std::size_t>(texture_grid.height));
   copy.extent = make_cudaExtent(
     static_cast<std::size_t>(texture_grid.width), static_cast<std::size_t>(texture_grid.height), 1);
@@ -977,8 +1005,9 @@ __host__ bool FirstOrderDubinsBicycleCostImpl<
     HANDLE_ERROR(cudaEventSynchronize(static_costmap_done_));
     const float * interleaved = static_costmap_host_.data();
     for (std::size_t cell = 0; cell < cell_count; ++cell) {
-      if (!road_border.empty) road_border.clearance_m[cell] = interleaved[2U * cell];
-      if (!drivable_area.empty) drivable_area.clearance_m[cell] = interleaved[2U * cell + 1U];
+      const std::size_t base = 4U * cell;
+      if (!road_border.empty) road_border.clearance_m[cell] = interleaved[base];
+      if (!drivable_area.empty) drivable_area.clearance_m[cell] = interleaved[base + 1U];
     }
   }
   road_border.valid = true;

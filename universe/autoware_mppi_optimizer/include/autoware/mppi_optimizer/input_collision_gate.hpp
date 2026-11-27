@@ -32,6 +32,23 @@ struct InputCollisionConditions
   bool static_object{false};
 };
 
+/**
+ * Obstacle margin in the obstacle's own box axes: `lateral` along its sides, `longitudinal` along
+ * its heading (front and back). Implicitly constructible from one value for isotropic margins.
+ */
+struct ObstacleMargin
+{
+  // NOLINTNEXTLINE(google-explicit-constructor): a scalar margin is the isotropic special case.
+  ObstacleMargin(const float isotropic = 0.0F) : lateral(isotropic), longitudinal(isotropic) {}
+  ObstacleMargin(const float lateral_margin, const float longitudinal_margin)
+  : lateral(lateral_margin), longitudinal(longitudinal_margin)
+  {
+  }
+
+  float lateral;
+  float longitudinal;
+};
+
 struct InputCollisionResult
 {
   bool road_border{false};
@@ -50,7 +67,7 @@ struct InputCollisionResult
   const autoware_planning_msgs::msg::Trajectory & trajectory,
   const autoware_perception_msgs::msg::TrackedObjects & static_objects,
   const std::vector<Segment> & road_borders, const FirstOrderDubinsMppiVehicleParams & vehicle,
-  float obstacle_margin, float road_border_margin, InputCollisionConditions conditions,
+  ObstacleMargin obstacle_margin, float road_border_margin, InputCollisionConditions conditions,
   const std::vector<VegetationPoint> & vegetation_points = {}, float vegetation_margin = 0.0F);
 
 }  // namespace autoware::mppi_optimizer

@@ -4,7 +4,7 @@ The `autoware_mppi_optimizer` package optimizes trajectories with Model Predicti
 
 ## Overview
 
-This package depends on the external [mppi_generic_vendor](https://github.com/autowarefoundation/mppi_generic_vendor) package (`MPPI-Generic`) and ships first-order Dubins path-tracking extensions under `include/mppi/`. A CUDA library interface (`FirstOrderDubinsMppiInterface`) provides the optimizer for C++ / ROS callers. The active controller uses colored acceleration and steering noise, 16,384 rollouts per iteration, and 80 control steps at 0.1 s. The shipped configuration runs 10 iterations.
+This package depends on the external [mppi_generic_vendor](https://github.com/autowarefoundation/mppi_generic_vendor) package (`MPPI-Generic`) and ships first-order Dubins path-tracking extensions under `include/mppi/`. A CUDA library interface (`FirstOrderDubinsMppiInterface`) wraps the two-lane double-park MPPI example for use from C++ / ROS nodes.
 
 ### Layout
 
@@ -22,37 +22,27 @@ autoware_mppi_optimizer/
 - CUDA Toolkit (curand, cufft)
 - Eigen3
 
-TensorRT is not required by this package. CUDA remains required for the optimizer library, plugin, and CUDA-linked tests.
-
 ## Trajectory modifier plugin
 
 Configure `autoware::mppi_optimizer::plugin::TrajectoryMppiOptimizer` in the `plugin_names` list of `autoware_trajectory_modifier`. Place it first to optimize the primary candidate before other modifiers and optimizers.
 
-Only candidate index zero is processed; secondary candidates return before parameter updates or execution-history changes.
-
-The plugin requires odometry, tracked objects, route, and raw lanelet map data from the modifier. Acceleration, steering, and supplied predicted objects are used when available. Disabled, shadow-mode, conditional-gate skip, and error cycles preserve the upstream candidate. A rejected result preserves input geometry and may apply its deterministic velocity-limit fallback. A reference-length skip can still apply the existing short-reference steering hold.
-
-Road borders are filtered by elevation before they enter MPPI or its input collision trigger. For each border segment, the closest trajectory point in XY supplies a local height reference; a border whose interpolated height differs by more than `road_border_max_height_difference_m` is excluded. The parameter defaults to 2.5 m and can be changed at runtime. This keeps bridge and underpass borders from acting as obstacles on another level.
+The plugin uses odometry, acceleration, steering, tracked objects, route, and raw lanelet map data from the modifier. It returns the input points when MPPI is disabled, skipped, running in shadow mode, or reports an error. A rejected result preserves the input geometry and may still apply its deterministic velocity-limit fallback.
 
 Plugin parameters are below `mppi_optimizer`. The `enabled` and `shadow_mode` parameters control result application. Debug topics are below `~/debug/mppi` in the trajectory modifier node. The transient-local `enabled` debug topic is true only for a cycle where an optimized MPPI trajectory replaced the primary candidate; it is false when MPPI is disabled, skipped, rejected, or running in shadow mode.
 
-`limit_velocity_from_external` defaults to `false`. Set it to `true` to apply the latest subscribed `~/input/external_velocity_limit_mps` to MPPI. `limit_velocity_from_map` remains independent; map limits can still apply when external limits are disabled. Changes to either parameter take effect on the next primary-candidate processing cycle.
-
-`output_acceleration_state` and `output_steering_state` independently select the predicted physical actuator states for optimized trajectory points. Each defaults to `false`, which keeps the existing acceleration and steering command output. MPPI has no velocity command: optimized points use predicted velocity, except where the existing engage adjustment applies. The engage adjustment applies in both acceleration output modes: it can overwrite early published velocity and acceleration with fixed 0.25 values, subject to the first point's effective velocity limit. It runs after model-state validation; consistency with every point's limit and the validated state remains an unresolved design decision. Selecting the steering state keeps the predicted tire angle during a short-reference steering command hold.
+`output_acceleration_state` and `output_steering_state` independently select the predicted physical actuator states for optimized trajectory points. Each defaults to `false`, which keeps the existing acceleration and steering command output. MPPI has no velocity command: optimized points use predicted velocity, except where the existing engage adjustment applies. Selecting the acceleration state disables that fixed initial velocity/acceleration adjustment so the optimized prefix remains a model prediction. Selecting the steering state keeps the predicted tire angle during a short-reference steering command hold.
 
 The selections apply to the optimized prefix only, up to 80 points. Remaining points and skipped or rejected outputs retain their existing behavior, including velocity-limit and steering-hold fallbacks. The debug `optimized_trajectory` uses the selected values; `nominal_control_trajectory` continues to show commands.
+
+### Obstacle margins
+
+`obstacle_collision_margin_lateral` and `obstacle_safe_margin_lateral` apply to the obstacle's sides (in the obstacle's own box axes). `obstacle_collision_margin_longitudinal` and `obstacle_safe_margin_longitudinal` apply to its front and back, along its heading. A negative longitudinal value (the default) means "same as lateral". Soft cost is 1 at each face's collision boundary and falls to 0 at that face's safe margin (anisotropic ramps). See `MPPI_COSTS.md` section 9.1.
 
 ### Conditional optimization
 
 Set `optimize_only_on_input_collision: true` to run MPPI only when an enabled input collision condition is met. `trigger_on_road_border_collision` and `trigger_on_static_object_collision` are independent; either match starts optimization. Both triggers default to true, while conditional mode defaults to false to retain the existing behavior. When neither enabled condition matches, the plugin leaves all input points unchanged, including their velocity and steering fields, and publishes a skip diagnostic. With both triggers disabled, every cycle passes through unchanged.
 
-When the conditional gate changes from inactive to active, the plugin logs an `RCLCPP_WARN` naming each detected cause: road border, stationary avoidance target, or vegetation. A matching warning reports when it deactivates and why, such as a cleared collision and expired hold, an ineligible reference, or an unavailable input. Each transition is logged once; an activation hold does not repeat the activation warning after the collision clears.
-
-When MPPI is enabled and the required odometry, objects, route, and map are available, the plugin initializes the GPU optimizer on the first primary-candidate cycle before checking the collision conditions. A parameter, route, or map change resets the optimizer, which is initialized again on the next ready cycle. A skipped collision check does not defer GPU setup to the first matching trajectory.
-
-By default, activation uses `obstacle_collision_margin` and `road_border_collision_margin`. Set `use_soft_margins_for_input_collision: true` to also use the soft-cost zones: the object trigger uses `obstacle_collision_margin + obstacle_safe_margin`, and the road-border trigger uses `road_border_collision_margin + road_border_safe_margin`. This changes when MPPI starts; it does not change the MPPI costs or output collision validation.
-
-Set `use_vegetation_pointcloud: true` to include points with `class_id == VEGETATION` from the trajectory modifier's obstacle pointcloud. Points are transformed into the trajectory frame, cropped to the ego vehicle height and a corridor around the input trajectory, and projected into the third channel of MPPI's static 2D distance texture. The GPU uses that texture to screen possible contact, then checks the original points against the inflated ego footprint before excluding a rollout. `vegetation_collision_margin` sets the hard clearance from the ego footprint; `vegetation_safe_margin` adds the soft barrier outside it. `vegetation_min_height_m` and `vegetation_height_buffer_m` set the vertical crop relative to ego height. `ignore_obstacles` also disables vegetation. Missing or invalid clouds clear the vegetation scene for that cycle.
+By default, activation uses `obstacle_collision_margin_lateral` and `road_border_collision_margin`. Set `use_soft_margins_for_input_collision: true` to also use the soft-cost zones: the object trigger uses `obstacle_collision_margin_lateral + obstacle_safe_margin_lateral` (and, along the obstacle's front and back, the `_longitudinal` counterparts), and the road-border trigger uses `road_border_collision_margin + road_border_safe_margin`. This changes when MPPI starts; it does not change the MPPI costs or output collision validation.
 
 `min_input_collision_activation_duration_s` keeps the conditional gate open for at least that many seconds after the last matching collision check. Every matching cycle refreshes the hold. The default `0.0` disables the hold. The timer uses the node's ROS clock, so paused simulation time pauses the hold; a backward clock jump clears it. Disabling MPPI, missing required inputs, short trajectories, parameter updates, route or map changes, and processing errors also clear it. The hold requests an MPPI optimization, but output validation can still reject the result. The diagnostic `input_collision/activation_source` reports `condition`, `hold`, or `none`; `~/debug/mppi/enabled` continues to report whether an optimized output was applied.
 
@@ -85,7 +75,6 @@ Finite, collision-free rollouts are eligible for weighting. Eligible costs are n
 A weighted control sequence can be invalid even when contributing rollouts are valid, so the final reconstructed post-step states are validated separately. `validation_interpolation_substeps` accepts integers from 1 through 100 (default 1). With 1, only `x[1]` through `x[H]` are checked; larger values add evenly spaced geometric checks between those states, with matching fractional obstacle times. For example, 4 adds three checks per interval. This does not cover the initial ego-to-`x[1]` interval or guarantee continuous swept-volume clearance.
 
 `skip_if_invalid: true` rejects an invalid optimized result and preserves input geometry, with the deterministic velocity-limit fallback when active. A cycle with no eligible rollouts always rejects, regardless of that option. The meaning of disabling final rejection and any future option to retain unsafe rollouts in weighting remain unresolved requirements; neither policy was changed. Returning the upstream input when MPPI fails is accepted behavior, not a guarantee that the fallback is safe.
-
 ## Costmap heatmaps in RViz
 
 Set `enable_obstacle_costmap_debug: true` under `mppi_optimizer` to publish the obstacle cost field
@@ -140,21 +129,15 @@ Each cycle writes:
   index.csv
   cost_params.csv
   vehicle_params.csv
-  runtime_options.csv
   000000_reference.csv
   000000_optimized.csv
   000000_ego.csv
-  000000_nominal.csv
-  000000_nominal_traj.csv
-  000000_objects.csv
-  000000_road_borders.csv
-  000000_drivable.csv
-  000000_rollout_diagnostics.csv
   ...
 ```
 
 `*_ego.csv` stores the odometry / accel / steer initial condition used online.
-Offline retune loads ego, cost/vehicle/runtime parameters, nominal controls, tracked objects, road/drivable geometry, preferred centerline, limits, and control/delay history where recorded. Additional per-frame CSV files carry this context. Supplied predicted-path hypotheses and vegetation are not serialized/replayed by this workflow, so a no-op retune is not guaranteed to reproduce the online scene. Rollout diagnostics include decoded collision reason, time, geometry index, and object UUID when available. The separate cost-test report parser now accepts encoded safety-status integers as well as legacy boolean values.
+Offline retune loads ego + cost/vehicle params from the log so a no-op retune can match
+the logged MPPI (obstacles are still not replayed).
 
 Various features can be disabled by changing the following parameters set in `mppi_optimizer.param.yaml`:
 
@@ -180,7 +163,7 @@ Then restart the trajectory modifier and compare live MPPI to offline retune.
 
 Notes:
 
-- `ignore_obstacles` removes tracked/predicted obstacle hypotheses and vegetation from MPPI.
+- `ignore_obstacles` drops tracked objects before MPPI (matches offline's empty objects).
 - `ignore_road_borders` drops static road-border segments before MPPI.
 - `ignore_drivable_area` is retained as an ablation flag; on this stack boundary crash is already
   disabled in the cost (`isEgoOutsideDrivableArea` always false).
@@ -203,18 +186,16 @@ Notes:
   command-rate and command-acceleration limits provide the transition back to optimized steering.
 - The same command is held across the entire output when the current reference arc length is at or
   below `steering_hold_reference_length_threshold_m`. This also applies when short stopping
-  references skip MPPI optimization. A reference with no planar extent also skips optimization
-  and follows this steering-hold path. Set the threshold to `0.0` to disable the length trigger.
+  references skip MPPI optimization. Set the threshold to `0.0` to disable the length trigger.
 - `use_last_control_as_nominal` warm-starts `u_nom` from the previous applied MPPI result when its
   timestamp, plant replay, and shifted reference remain continuous. The elapsed timestamp selects
-  the shift count, and the current reference seed fills the newly exposed tail. Up to three final
-  reused samples blend toward the fresh seed for continuity.
+  the shift count, and the current diffusion seed fills the newly exposed tail.
 - `use_mpc_predicted_trajectory_as_nominal_steering` replaces the nominal steering prefix with
   steering inferred from the fresh MPC-predicted path only when MPPI was not applied on the
   preceding primary-candidate cycle. The MPC trajectory is read from
   `~/input/mpc_predicted_trajectory`; `mpc_predicted_trajectory_max_age_s` rejects stale input.
-  Acceleration and the nominal suffix continue to come from the reference seed or accepted
-  warm-start sequence.
+  Acceleration and the nominal suffix continue to come from the configured diffusion or temporal
+  seed.
 - `nominal_initial_steering_max_deviation_rad` limits `u_nom[0]` around the steering predicted when
   that command reaches the actuator after the existing steering-delay queue. A discontinuous
   reused horizon is discarded before the current-reference seed is clamped; `0.0` disables the
@@ -258,9 +239,3 @@ ros2 run autoware_mppi_optimizer mppi_offline_tuner.py -- \
 ```
 
 Adjust sliders, press **Retune** (or `r`). Overlay updates in place; metrics show max position/velocity error vs the reference.
-
-## Review and test coverage
-
-[Feature requirements and implementation status](FEATURE_REQUIREMENTS_REVIEW.md) preserves the user's feedback, subsequent decisions, and remaining TBD items. [GPU performance review](GPU_PERFORMANCE_REVIEW.md) traces the current execution path and distinguishes static findings from measurements still needed.
-
-The `test/` directory covers prediction selection and confidence ties, capacity and malformed input, post-step obstacle timing, first-command noise, zero-weight safety checks, activation, output/engage modes, interpolated validation, warm-start/history behavior, and report parsing. CPU-capable and GPU-dependent cases are registered separately where applicable. GPU initialization errors fail the affected tests; absence of a CUDA device can skip GPU cases. Display/OpenGL-dependent cases can still skip when their environment is unavailable. The latency benchmark uses 20 optimizer iterations and an interface-level synthetic workload, so its timings are not production plugin latency guarantees.

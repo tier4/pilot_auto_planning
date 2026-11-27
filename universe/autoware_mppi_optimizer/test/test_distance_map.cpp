@@ -984,7 +984,7 @@ TEST_F(DistanceMapGpuTest, HostAndGpuStateCostsUseTheSameFootprintModel)
   params.ego_length = 4.0F;
   params.ego_width = 2.0F;
   params.ego_axle_to_box_center = 0.0F;
-  params.obstacle_safe_margin = 2.0F;
+  params.obstacle_safe_margin_lateral = 2.0F;
   params.obstacle_barrier_weight = 1.0F;
   params.road_border_safe_margin = 2.0F;
   params.road_border_barrier_weight = 1.0F;
@@ -1043,8 +1043,8 @@ TEST_F(DistanceMapGpuTest, ObstacleCostmapIsTheTextureSliceTheRolloutsSample)
   TestParams params = distanceOnlyParams();
   params.ego_length = 4.0F;
   params.ego_width = 2.0F;
-  params.obstacle_collision_margin = 0.2F;
-  params.obstacle_safe_margin = 1.0F;
+  params.obstacle_collision_margin_lateral = 0.2F;
+  params.obstacle_safe_margin_lateral = 1.0F;
   params.obstacle_barrier_weight = 3.0F;
   cost_->setParams(params);
   constexpr float obstacle_x = 10.0F;
@@ -1067,7 +1067,7 @@ TEST_F(DistanceMapGpuTest, ObstacleCostmapIsTheTextureSliceTheRolloutsSample)
   ASSERT_GT(costmap.width, 0);
   ASSERT_GT(costmap.height, 0);
   ASSERT_EQ(costmap.clearance_m.size(), static_cast<std::size_t>(costmap.width * costmap.height));
-  const float margin = params.obstacle_collision_margin + params.obstacle_safe_margin;
+  const float margin = params.obstacle_collision_margin_lateral + params.obstacle_safe_margin_lateral;
   EXPECT_NEAR(costmap.safety_margin_m, margin, 1.0E-6F);
   EXPECT_NEAR(costmap.barrier_weight, params.obstacle_barrier_weight, 1.0E-6F);
   EXPECT_NEAR(costmap.referenceCost(), params.obstacle_barrier_weight * margin * margin, 1.0E-4F);

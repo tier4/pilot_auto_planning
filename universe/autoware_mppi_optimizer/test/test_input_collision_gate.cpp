@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <stdexcept>
 #include <vector>
 
 namespace autoware::mppi_optimizer
@@ -37,12 +38,13 @@ Trajectory make_trajectory(const std::vector<double> & x_positions)
   return trajectory;
 }
 
-TrackedObjects make_static_object(const double x)
+TrackedObjects make_static_object(const double x, const double y = 0.0)
 {
   TrackedObjects objects;
   objects.header.frame_id = "map";
   autoware_perception_msgs::msg::TrackedObject object;
   object.kinematics.pose_with_covariance.pose.position.x = x;
+  object.kinematics.pose_with_covariance.pose.position.y = y;
   object.kinematics.pose_with_covariance.pose.orientation.w = 1.0;
   object.shape.dimensions.x = 0.4;
   object.shape.dimensions.y = 0.4;
@@ -137,6 +139,40 @@ TEST(InputCollisionGate, UsesConfiguredCollisionMargins)
   EXPECT_TRUE(checkInputTrajectoryCollisions(
                 trajectory, objects, borders, make_vehicle(), 0.6F, 0.0F, {false, true})
                 .static_object);
+}
+
+TEST(InputCollisionGate, ObstacleMarginDependsOnTheObstacleAxis)
+{
+  // The 1 m ego box (half 0.5) is 0.5 m from the 0.4 m object's face in both tests below.
+  const auto trajectory = make_trajectory({0.0, 0.0});
+  const auto ahead = make_static_object(1.2);
+  const auto abreast = make_static_object(0.0, 1.2);
+  const auto check = [&trajectory](const TrackedObjects & objects, const ObstacleMargin margin) {
+    return checkInputTrajectoryCollisions(
+             trajectory, objects, {}, make_vehicle(), margin, 0.0F, {false, true})
+      .static_object;
+  };
+
+  // The object's front/back face is hit only by a longitudinal margin...
+  EXPECT_TRUE(check(ahead, {0.0F, 0.6F}));
+  EXPECT_FALSE(check(ahead, {0.6F, 0.0F}));
+  // ...and its side only by a lateral one.
+  EXPECT_TRUE(check(abreast, {0.6F, 0.0F}));
+  EXPECT_FALSE(check(abreast, {0.0F, 0.6F}));
+  // A scalar margin stays isotropic.
+  EXPECT_TRUE(check(ahead, 0.6F));
+  EXPECT_TRUE(check(abreast, 0.6F));
+  EXPECT_FALSE(check(ahead, 0.4F));
+}
+
+TEST(InputCollisionGate, RejectsNegativeObstacleMargin)
+{
+  const auto trajectory = make_trajectory({0.0, 0.0});
+  EXPECT_THROW(
+    checkInputTrajectoryCollisions(
+      trajectory, make_static_object(1.2), {}, make_vehicle(), ObstacleMargin{0.1F, -0.1F}, 0.0F,
+      {false, true}),
+    std::invalid_argument);
 }
 
 TEST(InputCollisionGate, IgnoresCollisionOutsideModifiablePrefix)

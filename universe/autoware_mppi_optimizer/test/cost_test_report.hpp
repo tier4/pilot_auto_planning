@@ -94,7 +94,7 @@ inline Params disabledParams()
   p.ego_length = 4.0F;
   p.ego_width = 2.0F;
   p.ego_axle_to_box_center = 0.0F;
-  p.obstacle_collision_margin = 0.0F;
+  p.obstacle_collision_margin_lateral = 0.0F;
   p.road_border_collision_margin = 0.0F;
   p.boundary_threshold = 2.0F;
   return p;
@@ -272,8 +272,8 @@ public:
     REPORT_PARAM(ego_axle_to_box_center);
     REPORT_PARAM(boundary_threshold);
     REPORT_PARAM(lateral_boundary_soft_margin);
-    REPORT_PARAM(obstacle_safe_margin);
-    REPORT_PARAM(obstacle_collision_margin);
+    REPORT_PARAM(obstacle_safe_margin_lateral);
+    REPORT_PARAM(obstacle_collision_margin_lateral);
     REPORT_PARAM(road_border_safe_margin);
     REPORT_PARAM(road_border_collision_margin);
     REPORT_PARAM(drivable_area_safe_margin);

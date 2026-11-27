@@ -10,6 +10,7 @@
 #include <mppi/cost_functions/cost.cuh>
 #include <mppi/cost_functions/dubins/distance_map_texture.cuh>
 #include <mppi/cost_functions/dubins/first_order_dubins_bicycle_kinematic_limits.cuh>
+#include <mppi/cost_functions/obstacle_margin_profile.cuh>
 #include <mppi/dynamics/dubins/first_order_dubins_bicycle.cuh>
 #include <mppi/utils/pinned_host_buffer.cuh>
 
@@ -86,11 +87,19 @@ struct FirstOrderDubinsBicycleCostParams : public CostParams<2>
   float ego_length = 0.55F * 1.5F;
   float ego_width = 0.28F * 1.5F;
   float ego_axle_to_box_center = 0.2F;
-  /** Added to ego half-length/width in OBB collision test (~standoff to obstacle surfaces). */
-  float obstacle_collision_margin = 0.2F;
+  /**
+   * Obstacle collision margin (~standoff to obstacle surfaces) on the obstacle's sides, i.e. its
+   * lateral direction. The longitudinal counterpart (front/back of the obstacle) is below.
+   */
+  float obstacle_collision_margin_lateral = 0.2F;
+  /** Longitudinal obstacle collision margin; negative means "same as the lateral margin". */
+  float obstacle_collision_margin_longitudinal = -1.0F;
   /** Added to the ego footprint when testing collision with road-border segments. */
   float road_border_collision_margin = 0.2F;
-  float obstacle_safe_margin = 0.5F;
+  /** Soft-barrier width beyond the collision margin on the obstacle's sides (lateral). */
+  float obstacle_safe_margin_lateral = 0.5F;
+  /** Longitudinal soft-barrier width; negative means "same as the lateral margin". */
+  float obstacle_safe_margin_longitudinal = -1.0F;
   float obstacle_barrier_weight = 0.0F;
   float vegetation_collision_margin = 0.2F;
   float vegetation_safe_margin = 0.4F;
@@ -100,6 +109,14 @@ struct FirstOrderDubinsBicycleCostParams : public CostParams<2>
   float drivable_area_safe_margin = 0.0F;
   float drivable_area_barrier_weight = 2000.0F;
   float crash_contact_penalty = 100000.0F;
+
+  /** Lateral/longitudinal obstacle zones derived from the margins above. */
+  __host__ __device__ mppi::cost::detail::ObstacleMarginProfile obstacleMarginProfile() const
+  {
+    return mppi::cost::detail::makeObstacleMarginProfile(
+      obstacle_collision_margin_lateral, obstacle_collision_margin_longitudinal, obstacle_safe_margin_lateral,
+      obstacle_safe_margin_longitudinal);
+  }
 };
 
 template <int NUM_TIMESTEPS>
@@ -142,6 +159,7 @@ struct alignas(16) FirstOrderDubinsRuntimeData
   float obs_x_[kMaxObstacles][NUM_TIMESTEPS] = {};
   float obs_y_[kMaxObstacles][NUM_TIMESTEPS] = {};
   float obs_yaw_[kMaxObstacles][NUM_TIMESTEPS] = {};
+  /** True obstacle half extents (no margin growth). Soft and collision margins are applied at use. */
   float obs_half_length_[kMaxObstacles] = {};
   float obs_half_width_[kMaxObstacles] = {};
   /** True when the obstacle pose is invariant across the supplied horizon. */
@@ -462,6 +480,14 @@ public:
    */
   __host__ __device__ float distanceToClosestObstacle(
     float x, float y, float yaw, int timestep, int * closest_obstacle = nullptr) const;
+
+  /**
+   * Anisotropic soft-obstacle violation in [0, 1] for the ego spine circles: 1 at/inside the
+   * collision-inflated box, 0 at/outside each axis's safe margin. The max over circles and
+   * obstacles is returned.
+   */
+  __host__ __device__ float softViolationToClosestObstacle(
+    float x, float y, float yaw, int timestep) const;
 
   /** Exact inflated-footprint collision; optionally returns the first intersecting segment. */
   __host__ __device__ bool egoIntersectsRoadBorder(
