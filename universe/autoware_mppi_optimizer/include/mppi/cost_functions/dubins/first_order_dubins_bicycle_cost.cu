@@ -432,12 +432,15 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
     const bool obstacle_geometry_changed = obstacle_geometry_dirty_;
     const bool road_border_geometry_changed = road_border_geometry_dirty_;
     const bool drivable_area_geometry_changed = drivable_area_geometry_dirty_;
+    const bool vegetation_geometry_changed = vegetation_geometry_dirty_;
     distance_map_refresh_pending_ = false;
     obstacle_geometry_dirty_ = false;
     road_border_geometry_dirty_ = false;
     drivable_area_geometry_dirty_ = false;
+    vegetation_geometry_dirty_ = false;
     refreshDistanceMapTexturesNow(
-      obstacle_geometry_changed, road_border_geometry_changed, drivable_area_geometry_changed);
+      obstacle_geometry_changed, road_border_geometry_changed, drivable_area_geometry_changed,
+      vegetation_geometry_changed);
   }
   refreshPreferredLaneCenterTexture();
   if (nearest_segment_refresh_pending_) {
@@ -762,6 +765,17 @@ void FirstOrderDubinsBicycleCostImpl<
   runtimeData().num_obstacles_ = 0;
   dataToDevice();
   refreshDistanceMapTextures(geometry_changed, false, false);
+}
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+void FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
+  setVegetationPoints(const std::vector<autoware::mppi_optimizer::VegetationPoint> & points)
+{
+  if (points.empty() && vegetation_points_.empty()) return;
+  vegetation_points_ = points;
+  uploadVegetationCollisionPoints();
+  vegetation_geometry_dirty_ = true;
+  refreshDistanceMapTextures(false, false, false);
 }
 
 template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
@@ -1202,6 +1216,166 @@ FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>:
 #endif
   return distanceToClosestObstacleAnalyticalFallback(
     circle_x, circle_y, circle_radius, t, runtimeData(), closest_obstacle);
+}
+
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ bool FirstOrderDubinsBicycleCostImpl<CLASS_T, NUM_TIMESTEPS, PARAMS_T, DYN_PARAMS_T>::
+  egoIntersectsObstacleAtFractionalStep(
+    const float x, const float y, const float yaw, const float timestep) const
+{
+  const float t = std::clamp(timestep, 0.0F, static_cast<float>(NUM_TIMESTEPS - 1));
+  const int lo = static_cast<int>(t);
+  const int hi = std::min(lo + 1, NUM_TIMESTEPS - 1);
+  const float fraction = t - static_cast<float>(lo);
+  const float ego_cos = std::cos(yaw);
+  const float ego_sin = std::sin(yaw);
+  const float ego_cx = x + this->params_.ego_axle_to_box_center * ego_cos;
+  const float ego_cy = y + this->params_.ego_axle_to_box_center * ego_sin;
+  const auto margins = this->params_.obstacleMarginProfile();
+  const float ego_hl = this->params_.ego_length * 0.5F + margins.collision_ego_margin;
+  const float ego_hw = this->params_.ego_width * 0.5F + margins.collision_ego_margin;
+  const auto & data = runtimeData();
+  for (int i = 0; i < data.num_obstacles_; ++i) {
+    if (!data.obs_is_static_[i] && t > data.dynamic_obstacle_last_step_ + 1.0E-5F) {
+      continue;
+    }
+    const float ox = data.obs_x_[i][lo] + fraction * (data.obs_x_[i][hi] - data.obs_x_[i][lo]);
+    const float oy = data.obs_y_[i][lo] + fraction * (data.obs_y_[i][hi] - data.obs_y_[i][lo]);
+    const float angle =
+      data.obs_yaw_[i][lo] +
+      fraction * angle_utils::shortestAngularDistance(data.obs_yaw_[i][lo], data.obs_yaw_[i][hi]);
+    const float obs_cos = std::cos(angle);
+    const float obs_sin = std::sin(angle);
+    if (orientedBoxesOverlap(
+          ego_cx, ego_cy, ego_cos, ego_sin, ego_hl, ego_hw, ox, oy, obs_cos, obs_sin,
+          data.obs_half_length_[i] + margins.collision_extra_length,
+          data.obs_half_width_[i] + margins.collision_extra_width)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ __device__ float FirstOrderDubinsBicycleCostImpl<
+  CLASS_T, NUM_TIMESTEPS, PARAMS_T,
+  DYN_PARAMS_T>::distanceToClosestVegetation(const float x, const float y, const float yaw) const
+{
+#ifdef __CUDA_ARCH__
+  if (!texture_state_.vegetation_texture_valid_) return kDistanceMapEmptyDistance;
+  const float cos_yaw = cosf(yaw);
+  const float sin_yaw = sinf(yaw);
+  const float center_x = x + this->params_.ego_axle_to_box_center * cos_yaw;
+  const float center_y = y + this->params_.ego_axle_to_box_center * sin_yaw;
+  float circle_x[kEgoSpineCircleCount];
+  float circle_y[kEgoSpineCircleCount];
+  float circle_radius = 0.0F;
+  computeEgoSpineCircles(
+    center_x, center_y, cos_yaw, sin_yaw, this->params_.ego_length * 0.5F,
+    this->params_.ego_width * 0.5F, circle_x, circle_y, circle_radius);
+  const auto & grid = texture_state_.static_distance_map_grid_;
+  float minimum = kDistanceMapEmptyDistance;
+#pragma unroll
+  for (int circle = 0; circle < kEgoSpineCircleCount; ++circle) {
+    const float tx = (circle_x[circle] - grid.origin_x) / grid.resolution;
+    const float ty = (circle_y[circle] - grid.origin_y) / grid.resolution;
+    if (!textureCoordinateInBounds(tx, ty, grid)) return -1000.0F;
+    minimum = fminf(
+      minimum, tex2D<float4>(texture_state_.static_distance_texture_, tx, ty).z - circle_radius);
+  }
+  // Point-to-cell quantization and bilinear interpolation may overestimate clearance.
+  return minimum - 2.5F * grid.resolution;
+#else
+  if (vegetation_points_.empty()) return kDistanceMapEmptyDistance;
+  const float cos_yaw = std::cos(yaw);
+  const float sin_yaw = std::sin(yaw);
+  const float center_x = x + this->params_.ego_axle_to_box_center * cos_yaw;
+  const float center_y = y + this->params_.ego_axle_to_box_center * sin_yaw;
+  float minimum = kDistanceMapEmptyDistance;
+  for (const auto & point : vegetation_points_) {
+    minimum = std::min(
+      minimum, signedDistancePointToOrientedBox(
+                 point.x, point.y, center_x, center_y, cos_yaw, sin_yaw,
+                 this->params_.ego_length * 0.5F, this->params_.ego_width * 0.5F));
+  }
+  return minimum;
+#endif
+}
+
+template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
+__host__ __device__ bool FirstOrderDubinsBicycleCostImpl<
+  CLASS_T, NUM_TIMESTEPS, PARAMS_T,
+  DYN_PARAMS_T>::egoIntersectsVegetation(const float x, const float y, const float yaw) const
+{
+#ifdef __CUDA_ARCH__
+  if (!texture_state_.vegetation_texture_valid_) return false;
+  // The circles and quantized distance texture are conservative. Confirm possible contact
+  // against the original points so a safe rollout is not excluded by that approximation.
+  if (
+    distanceToClosestVegetation(x, y, yaw) >
+    1.414214F * this->params_.vegetation_collision_margin) {
+    return false;
+  }
+  const auto & data = runtimeData();
+  if (data.num_vegetation_collision_points_ <= 0 || !data.vegetation_collision_points_) {
+    return false;
+  }
+  const float cos_yaw = cosf(yaw);
+  const float sin_yaw = sinf(yaw);
+  const float center_x = x + this->params_.ego_axle_to_box_center * cos_yaw;
+  const float center_y = y + this->params_.ego_axle_to_box_center * sin_yaw;
+  const float half_length =
+    this->params_.ego_length * 0.5F + this->params_.vegetation_collision_margin;
+  const float half_width =
+    this->params_.ego_width * 0.5F + this->params_.vegetation_collision_margin;
+  const float x_radius = fabsf(cos_yaw) * half_length + fabsf(sin_yaw) * half_width;
+  const float y_radius = fabsf(sin_yaw) * half_length + fabsf(cos_yaw) * half_width;
+  const float minimum_x = center_x - x_radius;
+  const float maximum_x = center_x + x_radius;
+  const auto * points = data.vegetation_collision_points_;
+  int low = 0;
+  int high = data.num_vegetation_collision_points_;
+  while (low < high) {
+    const int middle = low + (high - low) / 2;
+    if (points[middle].x < minimum_x)
+      low = middle + 1;
+    else
+      high = middle;
+  }
+  for (int index = low; index < data.num_vegetation_collision_points_; ++index) {
+    const float2 point = points[index];
+    if (point.x > maximum_x) break;
+    const float dx = point.x - center_x;
+    const float dy = point.y - center_y;
+    if (fabsf(dy) > y_radius) continue;
+    if (
+      fabsf(dx * cos_yaw + dy * sin_yaw) <= half_length &&
+      fabsf(-dx * sin_yaw + dy * cos_yaw) <= half_width) {
+      return true;
+    }
+  }
+  return false;
+#else
+  const float cos_yaw = std::cos(yaw);
+  const float sin_yaw = std::sin(yaw);
+  const float center_x = x + this->params_.ego_axle_to_box_center * cos_yaw;
+  const float center_y = y + this->params_.ego_axle_to_box_center * sin_yaw;
+  const float half_length =
+    this->params_.ego_length * 0.5F + this->params_.vegetation_collision_margin;
+  const float half_width =
+    this->params_.ego_width * 0.5F + this->params_.vegetation_collision_margin;
+  for (const auto & point : vegetation_points_) {
+    const float dx = static_cast<float>(point.x) - center_x;
+    const float dy = static_cast<float>(point.y) - center_y;
+    if (
+      std::abs(dx * cos_yaw + dy * sin_yaw) <= half_length &&
+      std::abs(-dx * sin_yaw + dy * cos_yaw) <= half_width) {
+      return true;
+    }
+  }
+  return false;
+#endif
 }
 
 template <class CLASS_T, int NUM_TIMESTEPS, class PARAMS_T, class DYN_PARAMS_T>
